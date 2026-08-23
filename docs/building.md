@@ -100,6 +100,25 @@ an improvement.
 
 ## Building an APK
 
+### First run
+
+The build scripts invoke the CLI as `npx eas-cli`, so there is nothing to install
+globally — Expo advises against that anyway, because the CLI moves quickly and a
+stale global copy is a common source of confusing build failures. The first
+invocation downloads it and npm caches it from then on.
+
+Two things happen only once, and both need you rather than the script:
+
+```bash
+npx eas-cli login          # an expo.dev account
+npx eas-cli init           # links this folder to a project on your account
+```
+
+Without the first, every build stops at *"An Expo user account is required to
+proceed."* `init` writes an `extra.eas.projectId` into the config; `eas.json`
+sets `appVersionSource: "remote"`, so EAS keeps `versionCode` on the server and
+needs to know which project it belongs to.
+
 ### The quick one
 
 ```bash
@@ -108,8 +127,8 @@ npm run build:apk
 
 Runs the `preview` profile on EAS: a release APK with internal distribution, so
 the resulting link installs directly on any Android phone without the Play Store.
-First run will prompt you to log in and to generate a keystore — let it, and keep
-the credentials safe.
+First run will also offer to generate a keystore — let it, and keep the
+credentials safe.
 
 ### The others
 
@@ -121,8 +140,10 @@ the credentials safe.
 | `npm run build:dev` | `development` | APK | a dev client (needs Metro) |
 | `npm run build:apk:local` | `preview`, local | APK | building on this machine |
 
-A local build needs a JDK and the Android SDK on `PATH`; the cloud build needs
-neither.
+The cloud build needs nothing installed locally. `build:apk:local` builds on this
+machine instead, which means it needs the Android SDK and a **JDK 17** — see the
+JBR 25 trap under *Development* above, which applies here too. It still needs the
+account, because the signing credentials live on it.
 
 ### Version numbers
 
