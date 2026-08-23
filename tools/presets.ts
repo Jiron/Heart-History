@@ -39,10 +39,29 @@ export const PRESETS: Record<string, AugmentProfile> = {
     glare: { cx: 0.3, cy: 0.5, rx: 0.2, ry: 0.16, strength: 0.6 },
     jpegQuality: 60,
   },
-  unreadable: {
+  /**
+   * Very hard, but the information is still there.
+   *
+   * This was `unreadable` until the recogniser learned to sever the panel border
+   * and to take each row from whichever pass resolved it best; it now reads it
+   * correctly almost every time. Keeping it under its own name preserves the
+   * evidence that those changes were worth making.
+   */
+  severe: {
     perspective: 0.06, blurRadius: 4, blurPasses: 2, noiseSigma: 10,
     lighting: 0.45, lightingAngle: 200,
     glare: { cx: 0.52, cy: 0.42, rx: 0.32, ry: 0.26, strength: 0.75 },
     jpegQuality: 50,
+  },
+  /**
+   * Genuinely beyond reading: the glare sits squarely over the value block and
+   * the blur is wider than a segment, so the digits are not recoverable by any
+   * means. Nothing here may ever be accepted.
+   */
+  unreadable: {
+    perspective: 0.08, blurRadius: 8, blurPasses: 3, noiseSigma: 16,
+    lighting: 0.6, lightingAngle: 200,
+    glare: { cx: 0.62, cy: 0.45, rx: 0.42, ry: 0.34, strength: 0.95 },
+    jpegQuality: 35,
   },
 };

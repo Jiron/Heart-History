@@ -45,8 +45,10 @@ export only leaves the device when you pick a destination in the share sheet.
 
 ## How well does it read a display?
 
-Measured over 336 synthetic photos with known ground truth, across capture
-conditions from ideal to unusable:
+Two benchmarks, because they answer different questions.
+
+**256 synthetic photos** with known ground truth, spanning capture conditions
+from ideal to unusable:
 
 | Condition | Exact (all three values) | Wrongly accepted |
 |---|---|---|
@@ -55,13 +57,32 @@ conditions from ideal to unusable:
 | Steep angle | 100% | 0 |
 | Dim and grainy | 100% | 0 |
 | Glare and heavy blur | 100% | 0 |
-| Severe | 81% | 0 |
-| Genuinely unreadable | — | **0 of 48 accepted** |
+| Brutal | 100% | 0 |
+| Severe | 97% | 0 |
+| Genuinely unreadable | — | **0 of 32 accepted** |
 
-The last column matters most. A blood-pressure log that silently records the
-wrong number is worse than one that asks for another photo, so the recogniser
-refuses rather than guesses — and it refused every unreadable photo it was given.
-See [docs/ocr.md](docs/ocr.md) for how the recogniser works and why it fails safe.
+**Real photographs of the monitor**, each read through four different
+resize-and-re-encode chains because the exact one a phone uses cannot be
+reproduced offline — and on marginal photos a grey level or two decides whether a
+segment reads as lit:
+
+| Photo | Truth | Accepted | Read |
+|---|---|---|---|
+| Stored average, bright reflection | 117/81/81 | 1 of 4 | 117/81 |
+| Straight-on, panel fading to the right | 122/79/98 | 1 of 4 | 122/79 |
+| Low contrast, hard shadow over the glass | 107/78/98 | 2 of 4 | 107/78 |
+| Power-on self test (all segments lit) | must refuse | 0 of 4 | — |
+
+**Nothing wrong was ever accepted** — not in 256 synthetic images, not in 16 real
+reads. That is the column that matters: a blood-pressure log which silently
+records a number you did not measure is worse than one that asks you to check.
+
+The accept rate on the real photos is the honest caveat. All three are hard
+shots — a stored-average screen caught mid-fade, an LCD dimming across its own
+panel, a shadow lying diagonally over the glass — and on those the app reads the
+display about a quarter of the time and asks you to confirm the rest. A squarely
+lit photo behaves like the `clean` and `typical` rows above. See
+[docs/ocr.md](docs/ocr.md) for how it works and why it fails safe.
 
 ## Building an APK
 
@@ -87,7 +108,8 @@ Full instructions, including local builds and Play Store bundles, are in
 ```bash
 npm run android      # run in Expo Go
 npm test             # recogniser test suite
-npm run ocr:bench    # accuracy benchmark across capture conditions
+npm run ocr:bench    # accuracy benchmark across synthetic capture conditions
+npm run ocr:real     # accuracy against the real photos in tools/fixtures/
 npm run ocr:debug    # render one synthetic display and dump annotated PNGs
 npm run typecheck
 ```

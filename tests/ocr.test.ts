@@ -65,9 +65,28 @@ describe('recogniser', () => {
   });
 
   it('survives perspective, glare, noise and JPEG artefacts', () => {
-    for (const preset of ['typical', 'angled', 'hard'] as const) {
+    for (const preset of ['typical', 'angled', 'hard', 'brutal'] as const) {
       const r = recognise(photoOf(reading(135, 88, 64), preset, 42));
       expect([r.systolic, r.diastolic], preset).toEqual([135, 88]);
+    }
+  });
+
+  it('still reads a display the panel border has bridged into', () => {
+    // `severe` was the negative fixture until the recogniser learned to sever
+    // the border and to source each row from whichever pass resolved it best.
+    const r = recognise(photoOf(reading(128, 84, 72), 'severe', 3));
+    expect([r.systolic, r.diastolic]).toEqual([128, 84]);
+  });
+
+  it('omits a pulse it cannot stand behind rather than guessing one', () => {
+    // Whenever a pulse is reported it must be right; being absent is allowed.
+    for (const preset of ['typical', 'hard', 'brutal', 'severe'] as const) {
+      for (let seed = 0; seed < 4; seed++) {
+        const r = recognise(photoOf(reading(141, 90, 77), preset, seed));
+        if (r.ok && r.pulse !== null) {
+          expect(r.pulse, `${preset} seed ${seed}`).toBe(77);
+        }
+      }
     }
   });
 
@@ -105,6 +124,8 @@ describe('recogniser', () => {
 
 describe('safety: never invent a reading', () => {
   it('refuses an unreadable photo', () => {
+    // Glare covers the value block and the blur is wider than a segment, so a
+    // person could not read this either. Anything accepted here is invented.
     for (let seed = 0; seed < 8; seed++) {
       const r = recognise(photoOf(reading(122, 79, 98), 'unreadable', seed));
       expect(r.ok, `seed ${seed}`).toBe(false);
@@ -136,7 +157,7 @@ describe('safety: never invent a reading', () => {
       [145, 95, 77],
       [111, 71, 61],
     ] as const;
-    const presets = ['clean', 'typical', 'angled', 'dim', 'hard', 'brutal'] as const;
+    const presets = ['clean', 'typical', 'angled', 'dim', 'hard', 'brutal', 'severe'] as const;
 
     let accepted = 0;
     let falsePositives = 0;

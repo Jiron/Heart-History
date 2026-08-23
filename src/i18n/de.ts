@@ -378,6 +378,8 @@ export const de = {
       `Ein unplausibler Wert für ${field} (${value}) wurde ignoriert; erwartet werden ${min}–${max}.`,
     missingRows: (found: number) =>
       `Es wurden nur ${found} von 3 Wertezeilen gefunden.`,
+    pulseUnreadable:
+      'Der Puls war nicht sicher lesbar und wurde weggelassen. Blutdruck wurde gelesen.',
     isAverage:
       'Die Anzeige zeigt den gespeicherten Durchschnitt (A) und keine Einzelmessung.',
     couldNotReadImage: 'Die Bilddaten konnten nicht gelesen werden.',

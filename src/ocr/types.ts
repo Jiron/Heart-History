@@ -117,7 +117,7 @@ export interface OcrDebugArtifacts {
   glyphHeight: number;
   /** All ink components that survived filtering. */
   components: Component[];
-  /** Detected horizontal bands before classification. */
+  /** Every horizontal band found, before the value block was chosen. */
   bands: Box[];
   /** PNG-able overlay data is produced by tools, not here. */
   inkMask?: Mask;
@@ -146,6 +146,7 @@ export type OcrWarning =
   | { code: 'partialRow'; field: OcrField }
   | { code: 'implausibleValue'; field: OcrField; value: number; min: number; max: number }
   | { code: 'missingRows'; found: number }
+  | { code: 'pulseUnreadable' }
   | { code: 'isAverage' };
 
 export interface OcrResult {
