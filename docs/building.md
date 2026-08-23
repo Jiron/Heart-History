@@ -32,13 +32,34 @@ app, not of the code — everything else, including export, runs normally.
 To exercise restore, build and run the app for real:
 
 ```bash
-$env:EAS_BUILD_PROFILE = "development"   # PowerShell; grants INTERNET for Metro
+$env:JAVA_HOME = "$env:USERPROFILE\.gradle\jdks\eclipse_adoptium-17-amd64-windows.2"
+$env:EAS_BUILD_PROFILE = "development"   # grants INTERNET so it can reach Metro
 npx expo run:android
 ```
 
-The `EAS_BUILD_PROFILE` matters: released builds have `INTERNET` stripped from
-the manifest, and without it a local development build cannot reach Metro. See
-[requirements.md](requirements.md).
+Two things in that snippet are not optional:
+
+**`EAS_BUILD_PROFILE`.** Released builds have `INTERNET` stripped from the
+manifest. Without this, a local development build cannot reach Metro and will
+sit on a blank screen. See [requirements.md](requirements.md).
+
+**`JAVA_HOME` pointing at a JDK 17.** Android Studio now ships JBR 25, and
+building against it fails in the CMake configure step for `react-native-worklets`
+with the unhelpful message:
+
+```
+Execution failed for task ':react-native-worklets:configureCMakeDebug[x86_64]'.
+> WARNING: A restricted method in java.lang.System has been called
+```
+
+That is JDK 24+ refusing a native call, surfacing as a warning the Gradle task
+treats as failure. Gradle keeps a provisioned JDK 17 under `~/.gradle/jdks`;
+point `JAVA_HOME` at it. EAS cloud builds are unaffected — they use JDK 17
+already — so `npm run build:apk` needs none of this.
+
+`expo run:android` also rewrites the `android` script in `package.json` to point
+at itself. Change it back to `expo start --android`, or `npm run android` stops
+opening Expo Go.
 
 If the emulator does not pick up Metro automatically:
 
