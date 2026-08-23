@@ -144,24 +144,45 @@ export async function exportCsv(
 /**
  * Reads a file the user picked, whichever kind of URI Android hands back.
  *
- * The document picker returns a Storage Access Framework `content://` URI, and
- * the `File` class cannot read one — it reports "Missing 'READ' permission"
- * because there is no filesystem path behind it, only a ContentResolver entry.
- * `copyToCacheDirectory` is supposed to produce a real `file://` copy, but it
- * does not always, so the caller cannot rely on getting one.
+ * Restoring a backup is the one place the app reads something it did not write,
+ * and Android makes that awkward in two ways that rule out each other's fix:
  *
- * The legacy module's reader goes through the ContentResolver and handles both,
- * so it is the fallback for anything that is not plainly a file path.
+ * **A picked document is not a file.** The picker returns a Storage Access
+ * Framework `content://` reference — a ContentResolver entry with no filesystem
+ * path behind it. `File` rejects it with `Missing 'READ' permission`, and the
+ * legacy reader rejects it with `Unsupported scheme`; SDK 57 dropped resolver
+ * reads, and `StorageAccessFramework.readAsStringAsync` is only an alias for the
+ * same function.
+ *
+ * **So the picker is asked to copy it**, which yields a real `file://` path and
+ * works in a built app, where that path is inside the app's own cache.
+ *
+ * It does *not* work under Expo Go, where the copy lands in Expo Go's cache
+ * rather than the sandbox granted to the experience running inside it, and both
+ * readers refuse it. That is a limitation of the Expo Go host, not of this code
+ * — restore is verified against a development build for exactly that reason.
+ * Both readers are still tried, and both failures are reported, because a
+ * silent fallback would have made that far harder to work out.
  */
-async function readPickedFile(uri: string): Promise<string> {
-  if (uri.startsWith('file://')) {
-    try {
-      return await new File(uri).text();
-    } catch {
-      // Fall through to the resolver-backed reader below.
-    }
+async function readPickedFile(uri: string, t: Dictionary): Promise<string> {
+  const failures: string[] = [];
+  const describe = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+  try {
+    return await new File(uri).text();
+  } catch (e) {
+    failures.push(describe(e));
   }
-  return LegacyFileSystem.readAsStringAsync(uri, { encoding: 'utf8' });
+
+  try {
+    return await LegacyFileSystem.readAsStringAsync(uri, { encoding: 'utf8' });
+  } catch (e) {
+    failures.push(describe(e));
+  }
+
+  // Both readers are quoted, because which one failed and how is the only clue
+  // to whether this is a sandbox restriction or a genuinely unreadable file.
+  throw new Error(t.backup.couldNotRead(failures.join(' / ')));
 }
 
 export type ImportMode = 'merge' | 'replace';
@@ -216,7 +237,7 @@ export async function importBackup(mode: ImportMode, t: Dictionary): Promise<Imp
     };
   }
 
-  const text = await readPickedFile(picked.assets[0].uri);
+  const text = await readPickedFile(picked.assets[0].uri, t);
 
   let parsed: unknown;
   try {

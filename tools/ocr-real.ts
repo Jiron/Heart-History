@@ -32,24 +32,11 @@ import { join } from 'node:path';
 
 import { recognise } from '../src/ocr/pipeline';
 import type { OcrResult } from '../src/ocr/types';
-import { loadAsDeviceWould, type LoadOptions, type PhotoExpectation } from './fixture-photo';
+import { LOAD_VARIANTS, loadAsDeviceWould, type PhotoExpectation } from './fixture-photo';
 import { drawBox, grayToRgba, maskToRgba, writePng } from './ocr-debug-helpers';
 
 const FIXTURE_DIR = join(process.cwd(), 'tools', 'fixtures');
 const OUT_DIR = join(process.cwd(), 'tools', 'out', 'real');
-
-/**
- * Preprocessing chains spanning what a device plausibly produces.
- *
- * The first is the closest match to `src/services/scan.ts`; the others bracket
- * it, so a result that holds for only one of them is visibly not robust.
- */
-export const LOAD_VARIANTS: readonly { label: string; options: LoadOptions }[] = [
-  { label: '1100+jpeg', options: {} },
-  { label: '1100 raw', options: { reencode: false } },
-  { label: '1400+jpeg', options: { maxDim: 1400 } },
-  { label: 'full res', options: { maxDim: Number.MAX_SAFE_INTEGER } },
-];
 
 function fmt(v: number | null | undefined): string {
   return v === null || v === undefined ? '--' : String(v);
@@ -179,4 +166,4 @@ function main() {
   process.exit(wrongAcceptances > 0 ? 1 : 0);
 }
 
-if (process.argv[1] && process.argv[1].endsWith('ocr-real.ts')) main();
+main();

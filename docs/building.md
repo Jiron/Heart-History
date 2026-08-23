@@ -21,6 +21,25 @@ npm run start:clear  # same, but clear the bundler cache first
 Everything the app uses is bundled in Expo Go, so no custom development build is
 needed for day-to-day work.
 
+### The one thing Expo Go cannot do
+
+**Restoring a backup does not work inside Expo Go.** The document picker copies
+the chosen file into Expo Go's own cache directory, which is outside the sandbox
+granted to the experience running inside it, so both file readers refuse it with
+`Missing 'READ' permission` / `isn't readable`. It is a limitation of the host
+app, not of the code — everything else, including export, runs normally.
+
+To exercise restore, build and run the app for real:
+
+```bash
+$env:EAS_BUILD_PROFILE = "development"   # PowerShell; grants INTERNET for Metro
+npx expo run:android
+```
+
+The `EAS_BUILD_PROFILE` matters: released builds have `INTERNET` stripped from
+the manifest, and without it a local development build cannot reach Metro. See
+[requirements.md](requirements.md).
+
 If the emulator does not pick up Metro automatically:
 
 ```bash
@@ -38,11 +57,16 @@ npm run lint
 ### Working on the recogniser
 
 ```bash
-npm run ocr:bench                       # accuracy across every capture condition
+npm run ocr:bench                       # accuracy across every synthetic condition
 npm run ocr:bench -- --preset dim --verbose --seeds 3
+npm run ocr:real                        # accuracy against the real photos
+npm run ocr:real -- --write-debug       # annotated masks to tools/out/real/
 npm run ocr:debug                       # one display, annotated PNGs to tools/out/
 npm run ocr:debug -- --sys 148 --dia 93 --pul 101 --preset hard
 ```
+
+`ocr:real` is the one that decides whether a change was an improvement. See
+[ocr.md](ocr.md) for what the two benchmarks measure and why both are needed.
 
 `ocr:debug` writes `photo.png`, `gray.png` and `mask.png`. The mask overlay draws
 detected bands in red and probed glyph cells in blue — looking at that image is

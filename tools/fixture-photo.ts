@@ -95,6 +95,20 @@ export function loadAsDeviceWould(path: string, options: LoadOptions = {}): Rgba
   };
 }
 
+/**
+ * Preprocessing chains spanning what a device plausibly produces.
+ *
+ * The first is the closest match to `src/services/scan.ts`; the others bracket
+ * it. Reading a photo through all of them is how the benchmark and the tests
+ * avoid measuring one chain's luck — see the note in tools/ocr-real.ts.
+ */
+export const LOAD_VARIANTS: readonly { label: string; options: LoadOptions }[] = [
+  { label: '1100+jpeg', options: {} },
+  { label: '1100 raw', options: { reencode: false } },
+  { label: '1400+jpeg', options: { maxDim: 1400 } },
+  { label: 'full res', options: { maxDim: Number.MAX_SAFE_INTEGER } },
+];
+
 export interface PhotoExpectation {
   file: string;
   sys?: number;

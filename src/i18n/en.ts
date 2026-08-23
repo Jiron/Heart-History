@@ -400,6 +400,8 @@ export const en: Dictionary = {
       }
       return `${text}.`;
     },
+    couldNotRead: (detail: string) =>
+      `Could not read that file. Try picking it from the file manager rather than a cloud app. (${detail})`,
     saveDialog: 'Save your Heart History backup',
     csvDialog: 'Export readings as CSV',
     reportDialog: 'Share your blood pressure report',
