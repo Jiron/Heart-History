@@ -1,0 +1,271 @@
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
+import * as repo from '@/db/repository';
+import { dictionaryFor, resolveLanguage } from '@/i18n';
+import type { NewReading, Profile, Reading, Settings } from '@/domain/types';
+import { deletePhoto } from '@/services/scan';
+
+interface AppStateValue {
+  ready: boolean;
+  error: string | null;
+  settings: Settings;
+  profile: Profile;
+  profiles: Profile[];
+  /** Every reading for the active profile, newest first. */
+  readings: Reading[];
+  refresh: () => Promise<void>;
+  addReading: (input: NewReading) => Promise<Reading>;
+  editReading: (reading: Reading) => Promise<void>;
+  removeReading: (id: string) => Promise<void>;
+  updateSettings: (patch: Partial<Settings>) => Promise<void>;
+  addProfile: (name: string) => Promise<Profile>;
+  editProfile: (profile: Profile) => Promise<void>;
+  removeProfile: (id: string) => Promise<void>;
+  selectProfile: (id: string) => Promise<void>;
+}
+
+const AppStateContext = createContext<AppStateValue | null>(null);
+
+/**
+ * Startup status, published separately from the app state itself.
+ *
+ * The two are split because the splash screen can only be dismissed by something
+ * that renders, and the app state is not available until the database has
+ * opened. Gating every child on the state meant that a slow or failed open left
+ * the user staring at the splash forever, with the error captured but nothing
+ * mounted to show it.
+ */
+export interface Bootstrap {
+  ready: boolean;
+  error: string | null;
+  retry: () => void;
+}
+
+const BootstrapContext = createContext<Bootstrap>({
+  ready: false,
+  error: null,
+  retry: () => {},
+});
+
+export function useBootstrap(): Bootstrap {
+  return useContext(BootstrapContext);
+}
+
+export function AppStateProvider({ children }: { children: React.ReactNode }) {
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [readings, setReadings] = useState<Reading[]>([]);
+
+  const load = useCallback(async () => {
+    // Read the language preference first: on a fresh install `loadSettings`
+    // creates the default profile, and it should be named in the user's language.
+    const saved = (await repo.getSetting('language')) as Settings['language'] | null;
+    const dictionary = dictionaryFor(resolveLanguage(saved ?? 'de'));
+
+    const [loadedSettings, loadedProfiles] = await Promise.all([
+      repo.loadSettings(dictionary.profiles.defaultName),
+      repo.listProfiles(),
+    ]);
+    const active =
+      loadedProfiles.find((p) => p.id === loadedSettings.activeProfileId) ??
+      loadedProfiles[0];
+    const loadedReadings = active
+      ? await repo.listReadings({ profileId: active.id })
+      : [];
+
+    setSettings({ ...loadedSettings, activeProfileId: active?.id ?? loadedSettings.activeProfileId });
+    setProfiles(loadedProfiles);
+    setReadings(loadedReadings);
+  }, []);
+
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReady(false);
+    setError(null);
+    (async () => {
+      try {
+        await load();
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Could not open the database.');
+        }
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [load, attempt]);
+
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+
+  const profile = useMemo(
+    () => profiles.find((p) => p.id === settings?.activeProfileId) ?? profiles[0],
+    [profiles, settings?.activeProfileId],
+  );
+
+  const refresh = useCallback(async () => {
+    await load();
+  }, [load]);
+
+  const addReading = useCallback(
+    async (input: NewReading) => {
+      const created = await repo.insertReading(input);
+      setReadings((prev) =>
+        [created, ...prev].sort((a, b) => b.measuredAt - a.measuredAt),
+      );
+      return created;
+    },
+    [],
+  );
+
+  const editReading = useCallback(async (reading: Reading) => {
+    await repo.updateReading(reading);
+    setReadings((prev) =>
+      prev
+        .map((r) => (r.id === reading.id ? { ...reading, updatedAt: Date.now() } : r))
+        .sort((a, b) => b.measuredAt - a.measuredAt),
+    );
+  }, []);
+
+  const removeReading = useCallback(async (id: string) => {
+    // Read the row first so the photo can be cleaned up too; orphaned images
+    // would otherwise accumulate in app storage forever.
+    const existing = await repo.getReading(id);
+    await repo.deleteReading(id);
+    await deletePhoto(existing?.imageUri ?? null);
+    setReadings((prev) => prev.filter((r) => r.id !== id));
+  }, []);
+
+  const updateSettings = useCallback(
+    async (patch: Partial<Settings>) => {
+      for (const [key, value] of Object.entries(patch)) {
+        await repo.setSetting(key, String(value));
+      }
+      setSettings((prev) => (prev ? { ...prev, ...patch } : prev));
+      if (patch.activeProfileId) {
+        const next = await repo.listReadings({ profileId: patch.activeProfileId });
+        setReadings(next);
+      }
+    },
+    [],
+  );
+
+  const addProfile = useCallback(async (name: string) => {
+    const created = await repo.createProfile(name);
+    setProfiles((prev) => [...prev, created]);
+    return created;
+  }, []);
+
+  const editProfile = useCallback(async (next: Profile) => {
+    await repo.updateProfile(next);
+    setProfiles((prev) => prev.map((p) => (p.id === next.id ? next : p)));
+  }, []);
+
+  const selectProfile = useCallback(
+    async (id: string) => {
+      await repo.setSetting('activeProfileId', id);
+      setSettings((prev) => (prev ? { ...prev, activeProfileId: id } : prev));
+      setReadings(await repo.listReadings({ profileId: id }));
+    },
+    [],
+  );
+
+  const removeProfile = useCallback(
+    async (id: string) => {
+      await repo.deleteProfile(id);
+      const remaining = profiles.filter((p) => p.id !== id);
+      setProfiles(remaining);
+      if (settings?.activeProfileId === id && remaining[0]) {
+        await selectProfile(remaining[0].id);
+      }
+    },
+    [profiles, settings?.activeProfileId, selectProfile],
+  );
+
+  const value = useMemo<AppStateValue | null>(() => {
+    if (!settings || !profile) return null;
+    return {
+      ready,
+      error,
+      settings,
+      profile,
+      profiles,
+      readings,
+      refresh,
+      addReading,
+      editReading,
+      removeReading,
+      updateSettings,
+      addProfile,
+      editProfile,
+      removeProfile,
+      selectProfile,
+    };
+  }, [
+    ready,
+    error,
+    settings,
+    profile,
+    profiles,
+    readings,
+    refresh,
+    addReading,
+    editReading,
+    removeReading,
+    updateSettings,
+    addProfile,
+    editProfile,
+    removeProfile,
+    selectProfile,
+  ]);
+
+  const bootstrap = useMemo<Bootstrap>(
+    () => ({
+      // "Loaded but with no state" is a failure, not a ready app: the screens
+      // below assume a profile exists.
+      ready: ready && (value !== null || error !== null),
+      error: error ?? (ready && value === null ? 'Could not load your data.' : null),
+      retry,
+    }),
+    [ready, value, error, retry],
+  );
+
+  return (
+    <BootstrapContext.Provider value={bootstrap}>
+      <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>
+    </BootstrapContext.Provider>
+  );
+}
+
+export function useAppState(): AppStateValue {
+  const value = useContext(AppStateContext);
+  if (!value) {
+    throw new Error('useAppState must be used inside <AppStateProvider>');
+  }
+  return value;
+}
+
+/** Theme preference, readable before the rest of the state has loaded. */
+export function useThemePreference(): Settings['theme'] {
+  const value = useContext(AppStateContext);
+  return value?.settings.theme ?? 'system';
+}
+
+/** Language preference, readable before the rest of the state has loaded. */
+export function useLanguagePreference(): Settings['language'] {
+  const value = useContext(AppStateContext);
+  return value?.settings.language ?? 'de';
+}
