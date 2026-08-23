@@ -127,7 +127,11 @@ export const de = {
     driftMessage: (sys: number, dia: number) =>
       `Der systolische Wert verändert sich um rund ${sys} mmHg pro Woche, der diastolische um rund ${dia} mmHg. Einzelmessungen streuen stark — das beschreibt den Zeitraum, es sagt nichts über die nächste Messung.`,
     thisPeriod: 'Dieser Zeitraum',
-    pulsePressure: 'Blutdruckamplitude',
+    // "Blutdruckamplitude" is the fuller term but has no break point, so in a
+    // three-across stat grid it splits mid-word into "BLUTDRUCKAM / PLITUDE".
+    // "Pulsdruck" is the standard German equivalent and fits; the hint below it
+    // keeps it from being read as a pulse rate.
+    pulsePressure: 'Pulsdruck',
     pulsePressureHint: 'Abstand der beiden Werte',
     meanArterial: 'Mittlerer Druck',
     variation: 'Streuung',
@@ -269,6 +273,8 @@ export const de = {
     arm: 'Arm',
     left: 'Links',
     right: 'Rechts',
+    leftArm: 'Linker Arm',
+    rightArm: 'Rechter Arm',
     position: 'Position',
     sitting: 'Sitzend',
     lying: 'Liegend',

@@ -263,6 +263,8 @@ export const en: Dictionary = {
     arm: 'Arm',
     left: 'Left',
     right: 'Right',
+    leftArm: 'Left arm',
+    rightArm: 'Right arm',
     position: 'Position',
     sitting: 'Sitting',
     lying: 'Lying',
