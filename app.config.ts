@@ -25,6 +25,17 @@ const config: ExpoConfig = {
   scheme: 'hearthistory',
   userInterfaceStyle: 'automatic',
   assetBundlePatterns: ['**/*'],
+  extra: {
+    eas: {
+      projectId: "c1d8ffae-513c-4927-8607-967279d89248"
+    }
+  },
+  updates: {
+    url: "https://u.expo.dev/c1d8ffae-513c-4927-8607-967279d89248"
+  },
+  runtimeVersion: {
+    policy: "appVersion"
+  },
   android: {
     package: 'ch.opten.hearthistory',
     adaptiveIcon: {
