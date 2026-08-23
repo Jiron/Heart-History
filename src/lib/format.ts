@@ -1,5 +1,6 @@
 import { DAY_MS, startOfDay } from '@/domain/statistics';
-import { getLocale, type Dictionary } from '@/i18n';
+import { getLocale } from '@/i18n/locale';
+import type { Dictionary } from '@/i18n/de';
 
 export function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString(getLocale(), {

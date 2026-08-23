@@ -16,8 +16,11 @@ src/
   domain/                 types, BP classification, statistics
   db/                     SQLite schema, migrations, repository
   services/               scan (image to reading), backup, PDF report
+    reportHtml.ts         the report's markup — no platform imports, so it can
+                          be rendered and inspected in Node
   state/                  app-wide state and the scan hand-off
   i18n/                   dictionaries (German is the source of truth)
+    locale.ts             the active locale, with no React or Expo imports
   ui/                     design tokens, primitives, reading widgets
   charts/                 SVG charts built on react-native-svg
   lib/                    ids and formatting
@@ -119,6 +122,13 @@ layer needed no changes at all when the second language was added.
 than a React context, because date formatting happens in plain functions far from
 any component and threading a locale through all of them would add a parameter to
 code that is otherwise pure formatting.
+
+That variable lives in `i18n/locale.ts`, apart from the provider, so that reading
+the locale does not drag React Native in with it. It sounds fussy until something
+needs to run outside the app: the doctor's report formats dates, so a report that
+could only be built on a phone could only be *inspected* on a phone. With the
+import chain kept clean, `tools/report-preview.ts` renders the real markup to a
+file — which is how two bugs in it were found.
 
 ## Choices worth knowing about
 

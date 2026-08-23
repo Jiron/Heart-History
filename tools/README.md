@@ -16,6 +16,7 @@ guessed at.
 | `diag.ts` | Prints the band/column/candidate structure for one image |
 | `make-sample.ts` | Writes sample monitor photos as JPEGs, for testing on a device |
 | `seed-demo.ts` | Generates a backup file of realistic history, to exercise the charts |
+| `report-preview.ts` | Renders the doctor's report to HTML so its layout can be looked at in a browser |
 
 ```bash
 npm run ocr:bench
@@ -27,7 +28,18 @@ npm run ocr:debug -- --sys 148 --dia 93 --pul 101 --preset hard
 npx tsx tools/crop.ts fixtures/IMG_x.jpg 0.4 0.3 0.4 0.3 2   # x y w h zoom
 npx tsx tools/make-sample.ts          # sample photos into tools/out/
 npx tsx tools/seed-demo.ts > demo.json
+npx tsx tools/report-preview.ts       # tools/out/report.html
 ```
+
+## Looking at the doctor's report
+
+On the device the report goes straight into a PDF and then into a share sheet,
+which makes "does it actually look right" surprisingly hard to answer.
+`buildReportHtml` is free of React Native and Expo imports precisely so that
+`report-preview.ts` can run it here and write the same markup to a file. Both
+bugs found that way — a page with no background, which a dark-mode WebView
+rendered as dark text on dark, and a context column printing storage keys like
+`beforeMedication` into a German report — were invisible from the app itself.
 
 ## Adding a real photo
 

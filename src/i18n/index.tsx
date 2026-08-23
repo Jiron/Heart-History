@@ -3,39 +3,18 @@ import { getLocales } from 'expo-localization';
 
 import { de, type Dictionary } from './de';
 import { en } from './en';
+import { LANGUAGES, LOCALES, setLocale } from './locale';
+import type { Language, LanguagePreference } from './types';
 
-export type Language = 'de' | 'en';
-/** What the user picked. `system` follows the phone, falling back to German. */
-export type LanguagePreference = Language | 'system';
+/**
+ * The locale itself lives in `./locale`, which imports nothing from React or
+ * Expo. Formatting helpers read it from there, so pulling in a date format does
+ * not pull in the whole provider — see the note in that file.
+ */
+export { getLocale, LANGUAGES } from './locale';
+export type { Language, LanguagePreference } from './types';
 
 const DICTIONARIES: Record<Language, Dictionary> = { de, en };
-
-/**
- * BCP-47 tags used for date and number formatting.
- *
- * Swiss German rather than plain `de`, because it gets the date order and
- * separators right for where this app is used.
- */
-const LOCALES: Record<Language, string> = {
-  de: 'de-CH',
-  en: 'en-GB',
-};
-
-export const LANGUAGES: Language[] = ['de', 'en'];
-
-/**
- * The active locale, held in a module variable.
- *
- * Date and number formatting happens in plain functions all over the app, far
- * from any React context. Threading a locale through every one of them would add
- * a parameter to code that is otherwise pure formatting, so the language
- * provider publishes it here instead and `lib/format.ts` reads it.
- */
-let activeLocale: string = LOCALES.de;
-
-export function getLocale(): string {
-  return activeLocale;
-}
 
 /** Resolves a preference against the phone's settings. German is the default. */
 export function resolveLanguage(preference: LanguagePreference): Language {
@@ -71,7 +50,7 @@ export function I18nProvider({
     const language = resolveLanguage(preference);
     const locale = LOCALES[language];
     // Set before children render, so the first formatted date is already right.
-    activeLocale = locale;
+    setLocale(language);
     return { t: DICTIONARIES[language], language, locale };
   }, [preference]);
 
