@@ -149,7 +149,7 @@ function main() {
   }
   if (result.warnings.length) {
     console.log('warnings:');
-    for (const w of result.warnings) console.log(`  - ${w}`);
+    for (const w of result.warnings) console.log(`  - ${JSON.stringify(w)}`);
   }
   console.log(`\nwrote PNGs to ${OUT_DIR}`);
 }

@@ -1,0 +1,44 @@
+{
+  "$comment": [
+    "Ground truth for real photographs of a Microlife BP B1 Classic.",
+    "Add a photo to this folder, add an entry here, and `npm run ocr:real` will grade it.",
+    "",
+    "  sys/dia/pul  the values a human reads off the display",
+    "  accept       false when the recogniser must refuse the photo entirely",
+    "  date         { month, day } if the header shows a date, else omit",
+    "  average      true when the 'A' stored-average marker is lit",
+    "  note         why this photo is here"
+  ],
+  "photos": [
+    {
+      "file": "IMG_20260823_171545.jpg",
+      "sys": 117,
+      "dia": 81,
+      "pul": 81,
+      "average": true,
+      "note": "Stored average. Bright reflection over the top-left, no date in the header."
+    },
+    {
+      "file": "IMG_20260823_171609.jpg",
+      "sys": 122,
+      "dia": 79,
+      "pul": 98,
+      "date": { "month": 8, "day": 23 },
+      "note": "Straight-on measurement, unlit segments faintly ghosting."
+    },
+    {
+      "file": "IMG_20260823_171623.jpg",
+      "sys": 107,
+      "dia": 78,
+      "pul": 98,
+      "date": { "month": 8, "day": 22 },
+      "cuffFitOk": true,
+      "note": "Low contrast, a hard shadow edge cutting diagonally across the panel."
+    },
+    {
+      "file": "Screenshot_2026-08-23-17-19-27-234_com.miui.gallery-edit.jpg",
+      "accept": false,
+      "note": "Power-on self test: every segment lit. Reading it as 888/888 would be nonsense, so it must be refused."
+    }
+  ]
+}

@@ -15,17 +15,27 @@ take two or three readings a minute apart and average them. A mode that walks
 through that — rest timer, then prompts for each reading, then saves the average
 as one entry — would make the numbers meaningfully more reliable.
 
-**Tune against real photographs.** The recogniser is validated against synthetic
-fixtures with known ground truth, which covers the failure modes it was designed
-for but cannot contain a surprise the renderer does not know how to produce. Drop
-real photos into `tools/fixtures/` with expected values and extend the benchmark
-to read them. This is the single highest-value item for recognition quality.
+**More real photographs.** Four are in `tools/fixtures/` and every structural
+fix in the recogniser came from them — but four is not a sample, and all four are
+of the same unit in the same room. The next ten should be deliberately varied:
+different light, different angles, values with a leading `1`, an `Err` screen, a
+low battery. Drop them in with expected values in `expected.json` and both
+`npm run ocr:real` and the test suite pick them up automatically. This is the
+single highest-value item for recognition quality.
+
+**Raise the accept rate on hard photos.** The recogniser never accepts a wrong
+blood pressure, but on the three real fixtures it only reads the display about a
+quarter of the time; the rest are handed to the user to confirm. The refusals are
+each a specific rule firing rather than a vague lack of confidence, so they are
+addressable one at a time — the most common is only two of the three value rows
+being located, which the three-row safety rule then correctly refuses to guess
+from.
 
 **Detect the display icons.** The monitor's irregular-heartbeat symbol,
 cuff-fit-check tick and traffic-light position are read today only as user
 toggles. They sit at known positions relative to the value block, so detecting
-them is tractable — but it needs real photos to calibrate against, so it follows
-the item above.
+them is tractable — but it wants more real photos to calibrate against, so it
+follows the item above.
 
 **Batch scanning of stored readings.** The monitor keeps its last 30
 measurements. Stepping through them with `M` and scanning each is tedious; a mode

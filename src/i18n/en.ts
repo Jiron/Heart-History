@@ -370,6 +370,8 @@ export const en: Dictionary = {
       `Ignored an implausible ${field} reading of ${value} (expected ${min}-${max}).`,
     missingRows: (found: number) =>
       `Only ${found} of 3 value rows were found.`,
+    pulseUnreadable:
+      'The pulse could not be read reliably and was left out. Blood pressure was read.',
     isAverage:
       'The display shows the stored average (A), not a single measurement.',
     couldNotReadImage: 'Could not read the image data.',

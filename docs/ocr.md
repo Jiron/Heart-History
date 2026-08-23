@@ -60,12 +60,56 @@ The neighbourhood size trades two failure modes against each other:
 
 There is no single value that is right for every photo, so the window is sized
 from the measured stroke width, and the recogniser runs **several passes** at
-different multiples and keeps whichever produced the most coherent reading. One
-pass uses a heavier denoise for grainy photos. A complete, self-consistent,
-high-confidence result short-circuits the rest, so the common case still costs
-one pass.
+different multiples, sensitivities and denoise levels. A complete,
+self-consistent, high-confidence result short-circuits the rest, so the common
+case still costs one pass.
 
-### 3. Rows, and the digit that breaks them
+#### Measuring the stroke width from the wrong thing
+
+The window is sized from the stroke width, so getting that wrong makes every pass
+wrong together. The first estimate is the median ink run over the whole photo -
+and a photo of this device contains far more thin ink than thick: the moulded
+`microlife` wordmark, the SYS/DIA/PUL bezel labels, the tiny date row. On a frame
+where the panel fills only half the picture, the median lands nearer the *labels*
+than the values. Measured against real photographs it came out at ~10 px against
+a true segment thickness of ~20.
+
+That failure is quiet and vicious. Every window is then sized for a stroke half
+as thick as the one being read, so it fits *inside* each segment, and only the
+segment's outline survives. The digit does not vanish - it becomes a different
+digit, and `79` reads as `75`.
+
+The way out is that the first pass does not need to read the digits correctly to
+find *where* they are; banding survives a bad threshold. Once a glyph height is
+known, segment thickness follows from the geometry of a seven-segment face
+(about 0.16 x height), and the ladder is run again properly sized. Only one
+refinement is allowed, and only if the first attempt was not already conclusive.
+
+### 3. The panel's own border, and why it eats digits
+
+The value digits sit close to the right edge of the LCD glass. At some exposures
+the panel's dark border thresholds as ink - and when it does, it touches the
+upper-right and lower-right segment of every digit it runs past. Eight separate
+glyphs and a frame become **one** connected component: a sprawling outline that
+the stroke filter correctly refuses to treat as a glyph, and therefore discards.
+
+The digits do not disappear. They lose exactly their right-hand segments, so `9`
+reads as `5` and `8` reads as `6`. On real photographs of this device that was
+the single largest source of wrong readings.
+
+Dropping the whole component is the wrong response, and so is keeping it. The
+bridge is removed *before* anything is labelled, by erasing long thin straight
+runs of ink. A border is long and thin; a lit segment is short and fat. Measuring
+each ink pixel's horizontal and vertical run gives both numbers, and the ratio
+separates them cleanly - a segment stroke runs three to six times its own
+thickness, a panel edge fifty. Both thresholds sit far from the glyph population
+rather than at its edge, because trimming a real stroke costs a misread while
+leaving a border in place only costs this pass behaving as it used to.
+
+This runs as its own pass variant, not as a default. A photo whose border stays
+light does not need it, and any filter that can rescue a glyph can also trim one.
+
+### 4. Rows, and the digit that breaks them
 
 Components are grouped into horizontal bands by overlapping vertical extent. This
 works because a seven-segment glyph's strokes tile its full height with no gap —
@@ -86,23 +130,35 @@ pair of bands is also offered as a merged candidate**, letting the block selecto
 below decide which reading of the geometry is coherent. Provenance is tracked so
 a merged pair and one of its own halves can never both be chosen.
 
-### 4. Finding the three value rows
+### 5. Finding the three value rows
 
 The device gives three strong structural guarantees, and requiring all of them
 together is what rejects the printed bezel labels, the wordmark and the button
 outlines:
 
 1. the rows are **stacked** with a small vertical gap,
-2. they use glyphs of **comparable height**, and
+2. systolic and diastolic share a height, and the pulse row below is **smaller**,
 3. they are **right-aligned to a common edge**, because short values are padded
    with blanks on the left rather than leading zeros.
 
 Every subset of candidate rows is scored against these, not just consecutive
-ones — the icon strip puts symbols at heights that fall *between* the value rows,
+ones - the icon strip puts symbols at heights that fall *between* the value rows,
 and requiring adjacency meant a single cuff-fit tick could split the trio and
 silently drop the pulse.
 
-### 5. Right-anchored cells
+The second guarantee used to be stated as "all three rows are about the same
+height", which is simply not true of the hardware: the pulse row is around two
+thirds of the pressure rows. Scoring uniformity across all three punished the
+correct block for a property the device guarantees, and on a real photo the true
+trio scored *worse* than one that had swallowed the moulded wordmark - because
+the wordmark happened to be closer in height to the pressure rows than the pulse
+row is.
+
+The right edge is the strongest of the three. The values are the only thing on
+the panel that shares an exact right edge, so nothing accidental reproduces it,
+and it is weighted accordingly.
+
+### 6. Right-anchored cells
 
 Each glyph cell is anchored to its **right** edge, never its left or centre.
 
@@ -123,7 +179,7 @@ full-height, which is *exactly* what a `1` looks like. What separates them is th
 digits form a tightly pitched run ending at the shared right edge, and the
 indicator bar sits far outside it.
 
-### 6. Probing the segments
+### 7. Probing the segments
 
 Seven windows are sampled per cell, each covering the *core* of a segment and
 stopping short of the junctions so a lit neighbour bleeding round a corner cannot
@@ -138,7 +194,32 @@ trigger a single-segment correction (flip the least certain bit and re-check),
 which recovers the common case of one segment sitting right on the threshold —
 and marks the digit as corrected, which costs it confidence.
 
-### 7. Refusing to guess
+### 8. One reading, assembled from several passes
+
+A single pass has one threshold window and one sensitivity. A real photograph
+does not have one contrast.
+
+An LCD photographed even slightly off-axis fades unevenly: on one of the fixtures
+here, a digit's left-hand segments sit 80 grey levels below their background
+while the right-hand segments of the *same digit* sit only 20 below. The
+parameters that resolve the top of the panel are not the ones that resolve the
+bottom. Insisting that one pass read all three rows turns a solvable problem into
+a search for a corner of parameter space that may not exist, and the pass ladder
+has to grow combinatorially to keep finding it.
+
+The rows are independent measurements of independent parts of the image, so they
+are sourced independently: each of systolic, diastolic and pulse is taken from
+whichever pass read *that row* most confidently. What keeps it honest is that a
+row may only replace another if it describes the same piece of the photo - same
+position, same height, same right edge - and only if it is more confident.
+
+This is also why pass ranking multiplies by confidence rather than adding it.
+When the two were added, a pass that filled all three rows with noise outscored
+one that read two rows perfectly and admitted it could not see the third; the
+ladder then chose the wrong mask, and because that mask was internally consistent
+the wrongness survived to the acceptance check.
+
+### 9. Refusing to guess
 
 This is the part that matters most for a health app. A log that silently records
 122/79 as 70/40 is worse than one that asks for another photo, because a misread
@@ -153,20 +234,47 @@ is rarely obvious to the person reviewing it.
 - **Self-consistent numbers.** Systolic above diastolic, both in range, and a
   plausible gap between them.
 - **No corrected glyphs.** A snapped pattern means the cell grid was slightly
-  off, which tends to be wrong in ways segment probes cannot see.
+  off, which tends to be wrong in ways segment probes cannot see. Only rows that
+  actually contributed a number count here: a pulse row already rejected as
+  unreadable should not suppress a systolic and diastolic that both read
+  perfectly.
 - **Separated populations.** Confidence is the gap between the weakest lit
   segment and the strongest unlit one — not distance from a threshold, which
   *saturates*. A misaligned cell can have every probe land decisively on ink or
   decisively on background and still be reading the wrong digit; asking whether
   the two populations are distinguishable at all catches that.
 
+Pulse is treated differently from blood pressure, and deliberately so. It sits at
+the bottom of the panel in the smallest digits - exactly where a photo runs out
+of contrast first - so on real photographs it is the row that fails while the two
+pressure rows are still perfectly legible. A pulse the recogniser cannot stand
+behind is **dropped rather than reported**: it is optional in a reading, blood
+pressure is the measurement, and there is no cost to omitting it against a real
+cost to recording a wrong one.
+
+The bar is partly relative. An absolute floor alone is not enough, because a
+misread is not always an *uncertain* read - when the panel border swallows a
+segment, the probe lands decisively on background and the wrong digit comes back
+well resolved. What gives it away is the comparison: a display whose systolic and
+diastolic rows both read perfectly has no reason to produce a middling pulse, so
+a pulse row markedly worse than its neighbours is evidence about that row rather
+than about the photo.
+
+Dropping the pulse does not weaken the row-identification guarantee above, which
+depends on three rows being *located*, not on all three being readable.
+
 When it refuses, the review screen is still pre-filled with the best guess.
 `ok: false` means "please check this", not "start again".
 
 ## Measured accuracy
 
-`npm run ocr:bench` renders the display synthetically at known values, applies
-photographic degradation, and checks what comes back. 336 images per run.
+Two benchmarks, measuring different things. A change that improves one while
+regressing the other is not an improvement.
+
+### Against synthetic fixtures
+
+`npm run ocr:bench` renders the display at known values, applies photographic
+degradation, and checks what comes back. 256 images per run.
 
 | Condition | Exact | Sys+Dia | Accepted | Wrongly accepted |
 |---|---|---|---|---|
@@ -175,35 +283,84 @@ photographic degradation, and checks what comes back. 336 images per run.
 | Steep angle | 100% | 100% | 100% | 0 |
 | Dim and grainy | 100% | 100% | 100% | 0 |
 | Glare and blur | 100% | 100% | 100% | 0 |
-| Severe | 81% | 96% | 81% | 0 |
-| **Unreadable** | — | — | **0%** | **0 of 48** |
+| Brutal | 100% | 100% | 100% | 0 |
+| Severe | 97% | 97% | 94% | 0 |
+| **Unreadable** | - | - | **0%** | **0 of 32** |
 
-Roughly 45 ms per image in Node; on device the decode dominates and a scan takes
-well under a second.
+Roughly 35 ms per image in Node for a clean photo, rising to ~200 ms for one
+where every pass has to run because nothing succeeds.
 
-The `unreadable` row is a deliberate negative fixture — a photo a person could
-not read either. Refusing all 48 is as much a pass as reading the others.
+The `unreadable` row is a deliberate negative fixture: glare covers the value
+block and the blur is wider than a segment, so a person could not read it either.
+Refusing all 32 is as much a pass as reading the others. `severe` was that
+fixture until the border-severing and per-row merging described above made it
+readable; it kept its own name so the evidence stays in the table.
 
-### Why synthetic fixtures
+### Against real photographs
 
-Ground truth. Measuring accuracy needs to know the right answer for every image,
-which means either labelling hundreds of photos by hand or generating them.
-[`tools/render-display.ts`](../tools/render-display.ts) reproduces the structural
-traps rather than the exact pixels: right-aligned glyphs, an icon strip that can
-bridge rows, printed labels outside the panel, rows of two and three digits
-mixed. [`tools/augment.ts`](../tools/augment.ts) then applies perspective warp,
-lighting gradients, glare, blur, sensor noise and JPEG artefacts, all seeded so a
-failure reproduces exactly.
+`npm run ocr:real` runs actual photos of the device against
+[`tools/fixtures/expected.json`](../tools/fixtures/expected.json).
 
-This is a genuine limitation and worth stating plainly: **it validates the
-algorithm against the failure modes it was designed for, not against the full
-variety of real photographs.** The synthetic set cannot contain a surprise the
-renderer does not know how to produce.
+Each photo is read **four times**, through different resize-and-re-encode chains.
+That is not thoroughness for its own sake. A phone does not hand the recogniser
+the file on disk; it hands it a resized, re-encoded copy produced by a native
+pipeline whose resampling filter and JPEG encoder this benchmark cannot reproduce
+exactly. On photographs this marginal, a difference of a grey level or two flips
+a segment: the same algorithm reads `122/79` from one chain and `122/75` from
+another. Fixing one chain and reporting its score would measure that chain's
+luck, and it would disagree with the phone — which it did, until this benchmark
+started varying it.
 
-To check it against real photographs, drop them into `tools/fixtures/` and run
-`npm run ocr:debug -- --image path/to/photo.jpg`, which writes annotated PNGs of
-the ink mask, the detected bands and the probed cells to `tools/out/`. Those
-overlays are how every bug described above was found.
+| Photo | Truth | Accepted | What it read when it did |
+|---|---|---|---|
+| Stored average, bright reflection | 117/81/81 | 1 of 4 | 117/81 |
+| Straight-on, panel fading to the right | 122/79/98 | 1 of 4 | 122/79 |
+| Low contrast, hard shadow across panel | 107/78/98 | 2 of 4 | 107/78 |
+| Power-on self test (all segments lit) | must refuse | 0 of 4 | - |
+
+**Wrongly accepted: 0 of 16.** Every reading the app would have saved was right.
+
+The accept rate is the honest headline: on these three photographs it reads the
+display about a quarter of the time and asks the user to check the rest. They are
+all hard cases — a stored-average screen caught mid-fade, an LCD dimming across
+its own panel, a shadow lying diagonally over the glass — and the synthetic
+`clean` and `typical` rows above are what a squarely-lit photo looks like. But
+the number is what it is, and the refusals are not arbitrary: each one is a
+specific rule firing. Only two rows located, so systolic cannot be told from
+pulse. Systolic below diastolic. A pulse row markedly less legible than the
+pressure rows above it.
+
+Every structural fix in the pipeline — the stroke-width refinement, the
+row-height model, severing the panel border, per-row merging, confidence-weighted
+pass ranking — came from one of these four photos. None was visible in the
+synthetic set, which is the point of having them.
+
+### Why both
+
+Synthetic fixtures give ground truth. Measuring accuracy needs to know the right
+answer for every image, which means either labelling hundreds of photos by hand
+or generating them. [`tools/render-display.ts`](../tools/render-display.ts)
+reproduces the structural traps rather than the exact pixels: right-aligned
+glyphs, an icon strip that can bridge rows, printed labels outside the panel,
+rows of two and three digits mixed. [`tools/augment.ts`](../tools/augment.ts)
+then applies perspective warp, lighting gradients, glare, blur, sensor noise and
+JPEG artefacts, all seeded so a failure reproduces exactly.
+
+What they cannot contain is a surprise the renderer does not know how to draw -
+and every one of the real photographs contained at least one. An LCD that fades
+across the panel so half a digit is at a fifth of the contrast of the other half.
+A panel border dark enough to bridge into the digits. A pulse row two thirds the
+height of the pressure rows. Those were not oversights in the renderer so much as
+things nobody would think to draw.
+
+**Adding your own photos.** Drop them in `tools/fixtures/`, add an entry to
+`expected.json` with the values a human reads off the display, and run
+`npm run ocr:real`. The test suite picks them up automatically too. Use
+`npm run ocr:real -- --write-debug` for annotated PNGs of the ink mask, detected
+bands and probed cells, and `npx tsx tools/crop.ts <file> <x> <y> <w> <h> <zoom>`
+to magnify a region. Looking at those overlays is how nearly every bug described
+on this page was found - far faster than reasoning about why a number came out
+wrong.
 
 ## Adapting to another monitor
 
@@ -218,4 +375,7 @@ The tunable parts, all in [`types.ts`](../src/ocr/types.ts) and
 - `SEGMENT_WINDOWS` — where each segment is probed within a cell
 - `GLYPH_ASPECT` — fallback cell width/height
 - `DEFAULT_OCR_OPTIONS` — threshold sensitivity and the on/off band
-- `PASS_VARIANTS` in `pipeline.ts` — the window sizes tried
+- `PASS_VARIANTS` in `pipeline.ts` — the window sizes, sensitivities and
+  denoise levels tried
+- `PULSE_HEIGHT_RANGE` and `PRESSURE_HEIGHT_RATIO` in `layout.ts` — the row
+  height model, if another device sizes its rows differently

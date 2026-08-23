@@ -91,8 +91,16 @@ asks for another photo. The recogniser therefore only reports `ok: true` when:
 - no glyph had to be snapped to a nearest-match pattern, and
 - lit and unlit segments are cleanly separated in the image.
 
-Measured on the fixture suite this refuses 100% of unreadable photos while
-reading 100% of realistic ones exactly. See [ocr.md](ocr.md) for the numbers.
+Pulse is held to a stricter bar than blood pressure and simply left out when it
+cannot be resolved. It is optional in a reading, it sits in the least legible
+corner of the panel, and there is no cost to omitting it against a real cost to
+recording a wrong one.
+
+Measured across 256 synthetic photos and 16 reads of real ones, nothing wrong has
+ever been accepted. Readable synthetic photos are read exactly; the real photos
+in the fixture set are hard shots and are read about a quarter of the time, with
+the rest handed to the user to confirm. See [ocr.md](ocr.md) for the numbers and
+what limits them.
 
 Even when it refuses, the review screen is still pre-filled with the best guess —
 `ok: false` means "please check this", not "start again".

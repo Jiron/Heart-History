@@ -96,6 +96,90 @@ export interface SegmentFilterOptions {
  * judgements are therefore deferred to the layout stage, where each row's own
  * geometry is known.
  */
+/**
+ * Erases long, thin, straight lines from the ink mask.
+ *
+ * ## Why this exists
+ *
+ * The value digits sit close to the right edge of the LCD glass, and at some
+ * exposures the panel's dark border thresholds as ink. When it does, it touches
+ * the upper-right and lower-right segment of every digit it passes, and eight
+ * separate glyphs plus a frame become **one** connected component — a sprawling
+ * outline that `filterSegmentLike` correctly refuses to treat as a stroke, and
+ * therefore discards. The digits do not disappear; they lose exactly their
+ * right-hand segments, so 9 reads as 5 and 8 reads as 6. That was the single
+ * biggest source of wrong readings on real photographs of this device.
+ *
+ * Dropping the whole component is the wrong response, and so is keeping it. The
+ * fix is to remove the bridge before anything is labelled.
+ *
+ * ## What counts as a line
+ *
+ * A border is long and thin; a lit segment is short and fat. Measuring each ink
+ * pixel's horizontal and vertical run gives both numbers directly, and the ratio
+ * between them separates the two cleanly — a segment stroke runs about three to
+ * six times its own thickness, while a panel edge runs fifty. Requiring the line
+ * to also span a good fraction of the image keeps the test from nibbling at
+ * genuinely thin glyphs in the small header row, which are short.
+ *
+ * Both thresholds are deliberately far from the glyph population rather than
+ * tuned to its edge, because the cost of trimming a real stroke is a misread and
+ * the cost of leaving a border is only that this pass behaves as it used to.
+ */
+export function removeThinLines(
+  mask: Mask,
+  minAspect = 10,
+  minLengthRatio = 0.15,
+): Mask {
+  const { w, h, data } = mask;
+  const minLength = Math.max(24, Math.round(Math.min(w, h) * minLengthRatio));
+
+  const hRun = new Uint16Array(w * h);
+  const vRun = new Uint16Array(w * h);
+
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let x = 0;
+    while (x < w) {
+      if (!data[row + x]) {
+        x++;
+        continue;
+      }
+      const start = x;
+      while (x < w && data[row + x]) x++;
+      const len = Math.min(65535, x - start);
+      for (let i = start; i < x; i++) hRun[row + i] = len;
+    }
+  }
+
+  for (let x = 0; x < w; x++) {
+    let y = 0;
+    while (y < h) {
+      if (!data[y * w + x]) {
+        y++;
+        continue;
+      }
+      const start = y;
+      while (y < h && data[y * w + x]) y++;
+      const len = Math.min(65535, y - start);
+      for (let i = start; i < y; i++) vRun[i * w + x] = len;
+    }
+  }
+
+  const out = new Uint8Array(w * h);
+  for (let i = 0; i < out.length; i++) {
+    if (!data[i]) continue;
+    const a = hRun[i];
+    const b = vRun[i];
+    const long = a > b ? a : b;
+    const thin = a > b ? b : a;
+    if (long >= minLength && thin > 0 && long >= thin * minAspect) continue;
+    out[i] = 1;
+  }
+
+  return { w, h, data: out };
+}
+
 export function filterSegmentLike(
   components: Component[],
   opts: SegmentFilterOptions,

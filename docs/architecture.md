@@ -22,7 +22,8 @@ src/
   charts/                 SVG charts built on react-native-svg
   lib/                    ids and formatting
 
-tools/                    dev only: synthetic renderer, augmentation, benchmark
+tools/                    dev only: synthetic renderer, augmentation, benchmarks
+  fixtures/               real photographs of the device, with expected values
 tests/                    vitest suites
 docs/                     this
 ```
@@ -33,9 +34,9 @@ docs/                     this
 arrays and nothing else.
 
 That constraint is what makes the recogniser testable. The same file that runs on
-the phone runs in `vitest`, fed by a synthetic renderer instead of a camera, so
-the benchmark numbers describe the code that actually ships rather than a
-reimplementation of it. Every layer that *does* need a platform sits outside it:
+the phone runs in `vitest`, fed by a synthetic renderer or by real photographs
+instead of a camera, so the benchmark numbers describe the code that actually
+ships rather than a reimplementation of it. Every layer that *does* need a platform sits outside it:
 `services/scan.ts` is the only place that knows about `expo-image-manipulator`
 and `jpeg-js`.
 

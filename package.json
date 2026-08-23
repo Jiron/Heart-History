@@ -20,7 +20,8 @@
     "build:apk:local": "eas build --platform android --profile preview --local",
     "build:apk:prod": "eas build --platform android --profile production-apk",
     "build:aab": "eas build --platform android --profile production",
-    "build:dev": "eas build --platform android --profile development"
+    "build:dev": "eas build --platform android --profile development",
+    "ocr:real": "tsx tools/ocr-real.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

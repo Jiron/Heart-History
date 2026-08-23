@@ -404,6 +404,28 @@ export function selectValueBlock(candidates: RowCandidate[]): RowCandidate[] {
   return best;
 }
 
+/**
+ * How far the value rows' right edges may drift apart, as a fraction of cell
+ * width.
+ *
+ * This is the block's strongest signature. The three values are the only things
+ * on the display that share an exact right edge, so keeping this tight is what
+ * separates the real block from a plausible-looking trio that has swallowed the
+ * moulded logo or the date row. It cannot go to zero: photographing a curved
+ * panel off-axis moves the edges by a few percent of a glyph.
+ */
+const RIGHT_EDGE_TOLERANCE = 0.4;
+
+/**
+ * The pulse row is drawn *smaller* than the two pressure rows — about two
+ * thirds the height on the BP B1 Classic. Bounds are generous because other
+ * models in the family vary.
+ */
+const PULSE_HEIGHT_RANGE = { min: 0.45, max: 1.2 } as const;
+
+/** How far the systolic and diastolic rows may differ in height from each other. */
+const PRESSURE_HEIGHT_RATIO = 1.35;
+
 function scoreGroup(group: RowCandidate[], size: number): number {
   // A merged pair and either of its halves describe the same pixels; a group
   // containing both would be reading one row twice.
@@ -415,47 +437,71 @@ function scoreGroup(group: RowCandidate[], size: number): number {
     }
   }
 
-  const heights = group.map((r) => r.height);
-  const minH = Math.min(...heights);
-  const maxH = Math.max(...heights);
-  if (minH <= 0) return -Infinity;
+  const ordered = [...group].sort((a, b) => a.band.box.y - b.band.box.y);
+  const heights = ordered.map((r) => r.height);
+  if (Math.min(...heights) <= 0) return -Infinity;
 
-  // Heights must be in the same league. The pulse row is drawn slightly smaller
-  // than the two pressure rows, so this cannot be tight.
-  const heightRatio = maxH / minH;
-  if (heightRatio > 1.7) return -Infinity;
+  /*
+   * Height is judged against the device's actual layout, not against a hope
+   * that all three rows match.
+   *
+   * They do not: systolic and diastolic are the same size, and pulse is roughly
+   * two thirds of them. Scoring "all three heights equal" as the ideal punishes
+   * the correct block for a property the hardware guarantees — measured on real
+   * photographs the true trio scored *worse* than one that had swallowed the
+   * moulded logo, because the logo happened to be closer in height to the
+   * pressure rows than the pulse row is.
+   */
+  let uniformity: number;
+  let scaleH: number;
+  if (size >= 3) {
+    const ratio = Math.max(heights[0], heights[1]) / Math.min(heights[0], heights[1]);
+    if (ratio > PRESSURE_HEIGHT_RATIO) return -Infinity;
+    scaleH = (heights[0] + heights[1]) / 2;
+    const relative = heights[2] / scaleH;
+    if (relative < PULSE_HEIGHT_RANGE.min || relative > PULSE_HEIGHT_RANGE.max) {
+      return -Infinity;
+    }
+    uniformity = 1 - Math.min(1, (ratio - 1) / (PRESSURE_HEIGHT_RATIO - 1));
+  } else {
+    // A two-row block could be either pair, so it has to tolerate the drop to
+    // the pulse row. It can never be accepted as a reading on its own — see the
+    // three-row requirement in pipeline.ts — but it still has to be ranked.
+    const ratio = Math.max(...heights) / Math.min(...heights);
+    if (ratio > 1.9) return -Infinity;
+    scaleH = median(heights);
+    uniformity = 1 - Math.min(1, (ratio - 1) / 0.9);
+  }
 
-  const medH = median(heights);
-  const cellW = medH * GLYPH_ASPECT;
+  const cellW = scaleH * GLYPH_ASPECT;
 
   // Right edges must line up.
-  const rights = group.map((r) => r.right);
+  const rights = ordered.map((r) => r.right);
   const medRight = median(rights);
   const rightSpread = Math.max(...rights.map((r) => Math.abs(r - medRight)));
-  if (rightSpread > cellW * 0.75) return -Infinity;
+  if (rightSpread > cellW * RIGHT_EDGE_TOLERANCE) return -Infinity;
 
   // Rows must be genuinely adjacent, not separated by a gulf of blank display.
-  for (let i = 1; i < group.length; i++) {
-    const prev = group[i - 1].band.box;
-    const cur = group[i].band.box;
+  for (let i = 1; i < ordered.length; i++) {
+    const prev = ordered[i - 1].band.box;
+    const cur = ordered[i].band.box;
     const gap = cur.y - (prev.y + prev.h);
-    if (gap > medH * 1.3) return -Infinity;
-    if (gap < -medH * 0.2) return -Infinity;
+    if (gap > scaleH * 1.3) return -Infinity;
+    if (gap < -scaleH * 0.2) return -Infinity;
   }
 
   // A blood-pressure row is two or three digits. More than that is not a value.
   let glyphCount = 0;
-  for (const r of group) {
+  for (const r of ordered) {
     if (r.columns.length < 1 || r.columns.length > 3) return -Infinity;
     glyphCount += r.columns.length;
   }
 
-  const alignment = 1 - Math.min(1, rightSpread / (cellW * 0.75));
-  const uniformity = 1 - Math.min(1, (heightRatio - 1) / 0.7);
+  const alignment = 1 - Math.min(1, rightSpread / (cellW * RIGHT_EDGE_TOLERANCE));
 
-  // Prefer a complete three-row block, then tight alignment, then even heights,
-  // then simply more digits read.
-  return size * 100 + alignment * 40 + uniformity * 30 + glyphCount + medH * 0.05;
+  // Prefer a complete three-row block, then tight alignment — the one property
+  // no accidental grouping reproduces — then even pressure rows, then digits.
+  return size * 100 + alignment * 70 + uniformity * 25 + glyphCount + scaleH * 0.05;
 }
 
 /**
@@ -560,6 +606,17 @@ export function decodeBand(
    * the tilt a hand-held photo produces; removing the estimate took the angled
    * fixture set from 90% to 100% exact. Genuine off-axis distortion severe
    * enough to matter would need the panel rectified, not a per-row fudge factor.
+   *
+   * A second attempt measured the slant properly — globally, from the direction
+   * of the long near-vertical strokes, which does not depend on which segments
+   * happen to be lit — and rectified the whole image before recognition rather
+   * than nudging probe windows. It was written because the digits *look* italic
+   * in a photograph of the device. Measured, they are not: the correction came
+   * out at zero on all four real fixtures, fired only on degraded synthetic ones
+   * where it was tracking noise, and cost accuracy everywhere it did fire
+   * (angled 100% to 97%, severe 97% to 88%) as well as a third of the runtime.
+   * It was deleted. If a future device genuinely does slant, rectify the panel;
+   * do not reintroduce this.
    */
 
   // First pass at unit gain, purely to learn how much ink a lit segment actually
