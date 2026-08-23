@@ -409,6 +409,8 @@ export const de = {
       }
       return `${text}.`;
     },
+    couldNotRead: (detail: string) =>
+      `Die Datei liess sich nicht lesen. Wähle sie aus dem Dateimanager statt aus einer Cloud-App. (${detail})`,
     saveDialog: 'Heart-History-Sicherung speichern',
     csvDialog: 'Messungen als CSV exportieren',
     reportDialog: 'Blutdruckbericht teilen',

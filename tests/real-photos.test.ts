@@ -3,8 +3,11 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { recognise } from '../src/ocr/pipeline';
-import { loadAsDeviceWould, type PhotoExpectation } from '../tools/fixture-photo';
-import { LOAD_VARIANTS } from '../tools/ocr-real';
+import {
+  LOAD_VARIANTS,
+  loadAsDeviceWould,
+  type PhotoExpectation,
+} from '../tools/fixture-photo';
 
 /**
  * The recogniser measured against actual photographs of the device.
