@@ -167,8 +167,8 @@ Measured over the full fixture set, four renderings per photo:
 | Produced a reading | 24 of 27 | 23 of 27 |
 | Fully correct | 25 of 27 | 24 of 27 |
 | **Blood pressure wrong** | **0** | **0** |
-| Discrete VRAM | none | ~7.4 GB |
-| Memory used | ~7 GB of the shared pool | none |
+| Dedicated VRAM | 5.55 GB of the 64 GB carve | ~7.4 GB of 12 GB |
+| System RAM | ~0.95 GB working set | ~0.7 GB working set |
 
 The iGPU is about 50% slower. It also accepted one photo the discrete card
 refused, and **that is not evidence it is better** — it is one borderline image
@@ -204,10 +204,43 @@ That first flag is worth seeing the effect of. The 27B text model on this same
 machine, started without it, shows a **16 GB working set** — the whole weights
 file resident in the page cache. Same runtime, same GPU, one flag apart.
 
-On the integrated GPU, "VRAM" *is* system memory: the 8060S carves its pool out
-of the same RAM everything else uses, so roughly 7 GB is spoken for while the
-server runs. That is not a leak and not a duplicate; it is what an iGPU is, and
-it is the real cost of the row above.
+### The iGPU does not eat system RAM here, and that is not automatic
+
+On a machine where the iGPU takes memory dynamically, "VRAM" really is system
+RAM. This one is configured differently: 128 GB unified with **64 GB carved off
+in the BIOS as dedicated VRAM**, leaving 64 GB as system memory. The carve is
+separate silicon budget, so a model in it costs the system nothing.
+
+Measured, by stopping the server and diffing the counter:
+
+```
+iGPU dedicated with our model : 42.34 GB
+iGPU dedicated without it     : 36.79 GB
+our model                     :  5.55 GB
+```
+
+against a **949 MB** process working set. The weights are in the carve and not
+duplicated into RAM — which is the entire point of `--load-mode dio` and is not
+what you get by default. With mmap the GGUF lands in system RAM *and* is copied
+into the carve: paid for twice out of the same silicon.
+
+Read the split with:
+
+```powershell
+(Get-Counter "\GPU Adapter Memory(*)\Dedicated Usage").CounterSamples | Where-Object CookedValue -gt 0 | Select-Object InstanceName,@{n='GB';e={[math]::Round($_.CookedValue/1GB,2)}}
+```
+
+Two traps in the numbers, both of which cost an hour if you trust them:
+
+- **Private commit is not RAM.** The server shows ~8 GB of private bytes, which
+  WDDM charges to process commit for video allocations that occupy neither
+  working set nor pagefile. Watch the working set and the counter above; ignore
+  private bytes. Commit *headroom* is still worth checking before adding
+  anything resident, because the first allocation past the limit is the one that
+  fails.
+- **`--list-devices` free space is not headroom.** It reports the iGPU at
+  114 458 MiB, which is the 64 GiB carve plus a ~48 GiB system-memory aperture,
+  and it ignores what other processes have already committed.
 
 ## What this costs you
 

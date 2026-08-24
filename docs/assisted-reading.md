@@ -247,9 +247,10 @@ Not free, and the trade is real:
   on device. This is why the camera no longer waits — see `state/scanBuffer.ts`.
   Which GPU is a resource question rather than a quality one — zero wrong on
   both, and the one-photo difference in accept rate is backend noise on a
-  borderline image, not a reason to choose. It comes down to whether you would
-  rather spend the discrete card or ~7 GB of shared system memory.
-  `server/README.md` has the comparison.
+  borderline image, not a reason to choose. Neither costs system RAM on this
+  machine: 5.55 GB of the iGPU's dedicated 64 GB carve, or 7.4 GB of the 3060,
+  against a ~1 GB working set either way. `server/README.md` has the comparison
+  and how to measure it.
 
 ---
 
@@ -266,6 +267,10 @@ Not free, and the trade is real:
   consensus check are.
 - **Bigger images.** The vision tower resamples to its own grid. Above 1280 on
   the long side, nothing changes except decode time.
+- **Trusting private bytes or `--list-devices` free space as memory figures.**
+  The first is WDDM charging video allocations to process commit; the second is
+  the carve plus a system-memory aperture, ignoring what is already committed.
+  The dedicated-usage performance counter is the one that answers the question.
 - **Hardcoding a GPU index.** llama.cpp's device numbering is not stable —
   `--list-devices` reported `Vulkan0` as the RTX 3060 one hour and as the Radeon
   the next, same build, same hardware. `start-vlm.ps1` resolves the id by
