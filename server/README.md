@@ -193,6 +193,77 @@ authenticate through it — the bearer token is what this server understands.
 
 ---
 
+## Handling files from strangers
+
+The server takes uploads from whoever can reach the tunnel, so this is written
+down rather than assumed. `python server/attack_test.py` runs all of it against
+a live server and prints what happened.
+
+### Nothing that arrives can run
+
+There is no `eval`, no `exec`, no `subprocess`, no shell, no `pickle`. An
+upload's bytes are decoded to pixels, resized, re-encoded, and posted to
+llama-server. No filename from the request ever becomes a path — the only file
+this process writes in normal operation is its own `token.txt`.
+
+That is the structural answer, and it is the one that matters: an uploaded file
+is never a file here. It is a bitmap in memory for a few seconds.
+
+### Five decoders instead of forty-three
+
+`Image.open(BytesIO(raw))` will decode **43 formats**, because Pillow registers
+every plugin it has: BLP, DDS, FLI, FITS, PCD, PSD, GRIB, WMF and the rest. Most
+have carried memory-safety CVEs at some point, and none of them will ever be a
+photograph of a blood-pressure monitor.
+
+One is worse than the others. Pillow's **EPS plugin shells out to Ghostscript**
+to rasterise. Ghostscript is not installed here, so that path is inert today —
+and it is one `choco install ghostscript` away from being remote code execution
+in a service exposed to the internet. That is not a risk worth carrying for a
+format nobody will upload.
+
+So uploads are magic-byte checked before any decoder is handed them, and Pillow
+is then restricted with `formats=` to JPEG, PNG, WebP, MPO and AVIF. Both checks
+are cheap; together they cut the decoder surface by roughly 90%.
+
+### Bombs and floods
+
+| | |
+|---|---|
+| `MAX_UPLOAD_BYTES` | 25 MB. Larger gets `413` and the socket closed **without reading the body** — reading 26 MB to politely refuse 26 MB is the thing being defended against. |
+| `Image.MAX_IMAGE_PIXELS` | 40 MP, raised as an error. Pillow's own limit is ~89 MP and only *warns* below it; a few dozen bytes of PNG can declare a 50000×50000 canvas. |
+| `MAX_IN_FLIGHT` | 4. Each request in flight holds an upload, a decoded bitmap and four renderings, and `ThreadingHTTPServer` starts a thread per connection. The surplus gets an immediate `503`. |
+| `Handler.timeout` | 30 s on socket operations, so a connection that goes quiet mid-request does not hold a thread forever. |
+
+Verified: eight simultaneous uploads produce four `200`s and four `503`s.
+
+### What the model is shown
+
+Pixels, and nothing else. A phone photograph carries GPS coordinates and a
+camera model; re-encoding through Pillow without an `exif=` argument drops all
+of it, so the vision model never receives the location the photo was taken.
+Measured, not assumed — and there is a test for it, because someone adding
+`exif=` to fix an orientation bug would silently start forwarding it.
+
+It also means llama.cpp's own image decoder never sees a stranger's bytes. What
+reaches it is a JPEG this server encoded.
+
+### What this does *not* protect against
+
+Worth being plain about:
+
+- **Anyone holding the token can use your GPU.** Rate limiting is a concurrency
+  cap, not a quota. If the token leaks, rotate it: delete `server/token.txt`,
+  restart, update the app.
+- **A Pillow zero-day in JPEG or PNG itself.** The allowlist removes the exotic
+  decoders, not the ones we actually need. Keep Pillow current — this was
+  written against 12.3.0.
+- **Cloudflare sees the traffic.** They terminate TLS. That is inherent to the
+  tunnel, not something this server can change.
+- **The server runs as you.** It is not sandboxed or containerised. The
+  arguments above are about it having no mechanism to run anything, which is not
+  the same as a jail. If that distinction matters to you, run it in a container.
+
 ## Which GPU
 
 Selected by name, not by index:
