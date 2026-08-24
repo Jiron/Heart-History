@@ -8,13 +8,21 @@ import type { ExpoConfig } from 'expo/config';
  * blocked here, so a released build is *incapable* of sending a photo or a
  * reading anywhere — the guarantee holds even if a future dependency tries.
  *
- * The one exception is a development build, which has to reach the Metro bundler
- * on your machine to load JavaScript at all. That is opt-in and never shipped:
- * `preview`, `production` and `production-apk` all come out with no network
+ * There are two exceptions, both opt-in and neither on by default:
+ *
+ *   development    has to reach the Metro bundler on your machine to load
+ *                  JavaScript at all.
+ *   assisted-apk   is the build for people using a self-hosted reading server.
+ *                  See services/remoteOcr.ts for what that trades away and why
+ *                  it is a separate build rather than a setting: a permission
+ *                  the binary does not have cannot be turned on by a bug.
+ *
+ * `preview`, `production` and `production-apk` still come out with no network
  * access whatsoever. Day-to-day development in Expo Go is unaffected, because
  * Expo Go runs under its own manifest.
  */
 const isDevelopmentBuild = process.env.EAS_BUILD_PROFILE === 'development';
+const allowsNetwork = isDevelopmentBuild || process.env.HH_ALLOW_NETWORK === '1';
 
 const config: ExpoConfig = {
   name: 'Heart History',
@@ -46,7 +54,7 @@ const config: ExpoConfig = {
     permissions: ['android.permission.CAMERA', 'android.permission.VIBRATE'],
     blockedPermissions: [
       // See the note above: released builds have no network access at all.
-      ...(isDevelopmentBuild ? [] : ['android.permission.INTERNET']),
+      ...(allowsNetwork ? [] : ['android.permission.INTERNET']),
       'android.permission.RECORD_AUDIO',
       'android.permission.READ_MEDIA_VIDEO',
       'android.permission.SYSTEM_ALERT_WINDOW',
@@ -60,6 +68,15 @@ const config: ExpoConfig = {
   },
   plugins: [
     'expo-router',
+    [
+      // A reading server on your own network is reached over plain HTTP: it has
+      // no certificate a phone would trust, and issuing one for a house is not
+      // something anybody is going to do. Android blocks cleartext by default,
+      // so without this the assisted build fails every request with no useful
+      // error. It stays false for every build that has no network anyway.
+      'expo-build-properties',
+      { android: { usesCleartextTraffic: allowsNetwork } },
+    ],
     'expo-sqlite',
     'expo-sharing',
     'expo-localization',

@@ -344,6 +344,9 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'activeProfileId'> = {
   classificationScale: 'esh',
   keepPhotos: true,
   alwaysConfirmScans: false,
+  // Off unless the user sets it: the app reads on the device by default, and
+  // released builds have no network permission to reach a server with anyway.
+  ocrServerUrl: null,
 };
 
 export async function loadSettings(defaultProfileName = 'Me'): Promise<Settings> {
@@ -360,5 +363,6 @@ export async function loadSettings(defaultProfileName = 'Me'): Promise<Settings>
       DEFAULT_SETTINGS.classificationScale,
     keepPhotos: map.get('keepPhotos') !== 'false',
     alwaysConfirmScans: map.get('alwaysConfirmScans') === 'true',
+    ocrServerUrl: map.get('ocrServerUrl') || null,
   };
 }

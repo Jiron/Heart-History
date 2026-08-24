@@ -1,5 +1,13 @@
-import React, { useMemo } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useSyncExternalStore } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +26,7 @@ import {
 import { useTranslation } from '@/i18n';
 import { formatRelative } from '@/lib/format';
 import { useAppState } from '@/state/AppState';
+import { getScanJob, subscribeToScan } from '@/state/scanBuffer';
 import { Banner, Button, Card, EmptyState, Row, SectionHeader, StatTile } from '@/ui/components';
 import { CategoryPill, ReadingListItem, ReadingValue } from '@/ui/reading';
 import { useTheme } from '@/ui/ThemeProvider';
@@ -28,6 +37,9 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const { readings, settings, profile, profiles, refresh } = useAppState();
   const [refreshing, setRefreshing] = React.useState(false);
+  // A scan started from the camera keeps running after that screen closes,
+  // so it needs somewhere to be visible. See state/scanBuffer.
+  const scan = useSyncExternalStore(subscribeToScan, getScanJob, getScanJob);
 
   const scale = settings.classificationScale;
   const latest = readings[0] ?? null;
@@ -77,6 +89,32 @@ export default function DashboardScreen() {
         <Text style={{ ...theme.typography.label, color: theme.colors.textMuted }}>
           {profile.name}
         </Text>
+      ) : null}
+
+      {scan ? (
+        <Pressable onPress={() => router.push('/review')}>
+          <Card>
+            <Row style={{ alignItems: 'center', gap: 12 }}>
+              {scan.status === 'running' ? (
+                <ActivityIndicator color={theme.colors.accent} />
+              ) : (
+                <Ionicons
+                  name={scan.status === 'done' ? 'checkmark-circle' : 'alert-circle'}
+                  size={22}
+                  color={scan.status === 'done' ? theme.colors.accent : theme.colors.danger}
+                />
+              )}
+              <Text style={{ ...theme.typography.subheading, color: theme.colors.text, flex: 1 }}>
+                {scan.status === 'running'
+                  ? t.home.scanRunning
+                  : scan.status === 'done'
+                    ? t.home.scanReady
+                    : t.home.scanFailed}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={theme.colors.textFaint} />
+            </Row>
+          </Card>
+        </Pressable>
       ) : null}
 
       {latest ? (

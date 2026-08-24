@@ -69,6 +69,14 @@ export interface Settings {
   keepPhotos: boolean;
   /** Ask for confirmation before saving a scan, even at high confidence. */
   alwaysConfirmScans: boolean;
+  /**
+   * Address of a self-hosted assisted reader, or null to read on the device.
+   *
+   * Empty by default, and the app is perfectly usable that way. Setting it
+   * sends the photo to that address instead; see services/remoteOcr.ts for
+   * what that trades away.
+   */
+  ocrServerUrl: string | null;
 }
 
 export type ClassificationScale = 'esh' | 'home';

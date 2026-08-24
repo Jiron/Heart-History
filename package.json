@@ -20,13 +20,16 @@
     "build:apk:prod": "npx eas-cli build --platform android --profile production-apk",
     "build:aab": "npx eas-cli build --platform android --profile production",
     "build:dev": "npx eas-cli build --platform android --profile development",
-    "ocr:real": "tsx tools/ocr-real.ts"
+    "ocr:real": "tsx tools/ocr-real.ts",
+    "build:apk:assisted": "npx eas-cli build --platform android --profile assisted-apk",
+    "ocr:folders": "tsx tools/ocr-folders.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
     "base64-js": "^1.5.1",
     "buffer": "^6.0.3",
     "expo": "~57.0.15",
+    "expo-build-properties": "~57.0.14",
     "expo-camera": "~57.0.4",
     "expo-constants": "~57.0.13",
     "expo-document-picker": "~57.0.1",

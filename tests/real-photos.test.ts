@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -98,5 +98,54 @@ describe.skipIf(available.length === 0)('real photographs', () => {
     const { result } = readEveryWay(average)[0];
     expect(result.icons.average).toBe(true);
     expect(result.warnings.map((w) => w.code)).toContain('isAverage');
+  });
+});
+
+/**
+ * The foldered fixtures: many photographs of two known readings, taken the way
+ * people actually take them rather than the way the recogniser would like.
+ *
+ * A folder is named sys-dia-pul and every photo in it shows that reading, which
+ * makes adding more a matter of dropping files in rather than editing a manifest.
+ *
+ * Only the safety invariant is asserted. The on-device recogniser reads almost
+ * none of these -- see docs/ocr.md for the measured rate and why -- so a
+ * threshold here would either be set at zero, which asserts nothing, or fail on
+ * purpose. What must hold regardless is that when it does answer, it is right.
+ */
+const FOLDER_PATTERN = /^(\d+)-(\d+)-(\d+)$/;
+
+const folders = existsSync(FIXTURE_DIR)
+  ? readdirSync(FIXTURE_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && FOLDER_PATTERN.test(entry.name))
+      .map((entry) => {
+        const [, sys, dia, pul] = FOLDER_PATTERN.exec(entry.name)!;
+        return {
+          name: entry.name,
+          sys: Number(sys),
+          dia: Number(dia),
+          pul: Number(pul),
+          files: readdirSync(join(FIXTURE_DIR, entry.name)).filter((f) =>
+            /\.(jpe?g|png)$/i.test(f),
+          ),
+        };
+      })
+  : [];
+
+describe.skipIf(folders.length === 0)('photographs of a known reading', () => {
+  it('never reports a blood pressure the display did not show', () => {
+    for (const folder of folders) {
+      for (const file of folder.files) {
+        const path = join(FIXTURE_DIR, folder.name, file);
+        for (const variant of LOAD_VARIANTS) {
+          const result = recognise(loadAsDeviceWould(path, variant.options));
+          if (!result.ok) continue;
+          const where = `${folder.name}/${file} [${variant.label}]`;
+          expect(result.systolic, where).toBe(folder.sys);
+          expect(result.diastolic, where).toBe(folder.dia);
+          if (result.pulse !== null) expect(result.pulse, where).toBe(folder.pul);
+        }
+      }
+    }
   });
 });

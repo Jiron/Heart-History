@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
@@ -8,6 +8,7 @@ import { presetRange } from '@/domain/statistics';
 import type { Settings } from '@/domain/types';
 import { dictionaryFor, LANGUAGES, useTranslation } from '@/i18n';
 import { exportBackup, exportCsv, importBackup, type ImportMode } from '@/services/backup';
+import { checkServer } from '@/services/remoteOcr';
 import { exportReport } from '@/services/report';
 import { useAppState } from '@/state/AppState';
 import { Banner, Button, Card, Chip, Row, SectionHeader } from '@/ui/components';
@@ -19,6 +20,8 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { settings, updateSettings, readings, profile, profiles, refresh } = useAppState();
   const [busy, setBusy] = useState<string | null>(null);
+  const [serverDraft, setServerDraft] = useState(settings.ocrServerUrl ?? '');
+  const [serverState, setServerState] = useState<'unknown' | 'ok' | 'down'>('unknown');
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(
     null,
   );
@@ -173,6 +176,69 @@ export default function SettingsScreen() {
       </Card>
 
       <Card>
+        <SectionHeader title={t.settings.assistedReading} />
+        <Text style={{ ...theme.typography.caption, color: theme.colors.textFaint }}>
+          {t.settings.assistedReadingHint}
+        </Text>
+        <TextInput
+          value={serverDraft}
+          onChangeText={(text) => {
+            setServerDraft(text);
+            setServerState('unknown');
+          }}
+          placeholder="192.168.1.20:6000"
+          placeholderTextColor={theme.colors.textFaint}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          style={[
+            styles.serverInput,
+            {
+              backgroundColor: theme.colors.surfaceSunken,
+              color: theme.colors.text,
+              borderColor: theme.colors.border,
+            },
+          ]}
+        />
+        <Row>
+          <Button
+            title={t.settings.testConnection}
+            variant="secondary"
+            style={{ flex: 1 }}
+            loading={busy === 'server'}
+            onPress={async () => {
+              setBusy('server');
+              try {
+                setServerState((await checkServer(serverDraft)) ? 'ok' : 'down');
+              } finally {
+                setBusy(null);
+              }
+            }}
+          />
+          <Button
+            title={t.settings.save}
+            style={{ flex: 1 }}
+            onPress={() => updateSettings({ ocrServerUrl: serverDraft.trim() || null })}
+          />
+        </Row>
+        {serverState === 'ok' ? (
+          <Banner tone="success" message={t.settings.serverReachable} />
+        ) : null}
+        {serverState === 'down' ? (
+          <Banner tone="warning" message={t.settings.serverUnreachable} />
+        ) : null}
+        {settings.ocrServerUrl ? (
+          <Text style={{ ...theme.typography.caption, color: theme.colors.textFaint }}>
+            {t.settings.assistedReadingOn(settings.ocrServerUrl)}
+          </Text>
+        ) : (
+          <Text style={{ ...theme.typography.caption, color: theme.colors.textFaint }}>
+            {t.settings.assistedReadingOff}
+          </Text>
+        )}
+      </Card>
+
+      <Card>
         <SectionHeader title={t.settings.export} />
         <View style={{ gap: 10 }}>
           <Button
@@ -286,6 +352,15 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  serverInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    marginTop: 10,
+    marginBottom: 10,
+  },
   content: { padding: 16, gap: 16 },
   hint: { fontSize: 12, lineHeight: 17, marginTop: 12 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },

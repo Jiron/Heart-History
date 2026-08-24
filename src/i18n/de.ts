@@ -69,6 +69,9 @@ export const de = {
     noReadingsTitle: 'Noch keine Messungen',
     noReadingsMessage:
       'Richte die Kamera auf dein Blutdruckmessgerät — Heart History liest die Werte für dich ab. Oder gib sie von Hand ein.',
+    scanRunning: 'Anzeige wird gelesen …',
+    scanReady: 'Messung bereit zum Prüfen',
+    scanFailed: 'Anzeige konnte nicht gelesen werden',
     scanMonitor: 'Gerät scannen',
     sevenDayAverage: '7-Tage-Durchschnitt',
     sevenDayNote: (days: number, count: number) =>
@@ -176,6 +179,16 @@ export const de = {
     keepPhotos: 'Fotos behalten',
     keepPhotosHint:
       'Speichert jedes gescannte Bild bei der Messung, damit du es später prüfen kannst. Braucht mehr Speicher.',
+    assistedReading: 'Unterstütztes Lesen',
+    assistedReadingHint:
+      'Optional. Schickt das Foto an ein Bildmodell auf deinem eigenen Rechner, das die Anzeige deutlich zuverlässiger liest als dieses Gerät. Das Foto verlässt dein Netzwerk nicht und wird auf dem Server nicht gespeichert. Leer lassen, um ausschliesslich auf dem Gerät zu lesen.',
+    testConnection: 'Verbindung testen',
+    save: 'Speichern',
+    serverReachable: 'Server erreichbar, Modell geladen.',
+    serverUnreachable:
+      'Keine Antwort. Prüfe Adresse und Port und ob beide Dienste laufen.',
+    assistedReadingOn: (url: string) => `Aktiv: Fotos gehen an ${url}.`,
+    assistedReadingOff: 'Aus: Fotos werden ausschliesslich auf diesem Gerät gelesen.',
     export: 'Exportieren',
     reportPdf: 'Arztbericht (PDF)',
     backupJson: 'Sicherung (JSON)',
@@ -262,6 +275,13 @@ export const de = {
     nothingTitle: 'Nichts zu prüfen',
     nothingMessage: 'Dieser Scan wurde bereits gespeichert oder verworfen.',
     scanAgain: 'Erneut scannen',
+    readingTitle: 'Anzeige wird gelesen …',
+    readingOnDevice: 'Wird auf diesem Gerät ausgewertet.',
+    readingAssisted: 'Wird von deinem Lese-Server ausgewertet.',
+    typeInstead: 'Von Hand eintragen',
+    assistedFellBack:
+      'Der Lese-Server war nicht erreichbar — die Anzeige wurde auf dem Gerät gelesen, was bei schwierigen Fotos deutlich schlechter funktioniert.',
+    readByAssisted: 'Vom Lese-Server gelesen',
   },
 
   form: {
@@ -388,6 +408,8 @@ export const de = {
       'Der Puls war nicht sicher lesbar und wurde weggelassen. Blutdruck wurde gelesen.',
     isAverage:
       'Die Anzeige zeigt den gespeicherten Durchschnitt (A) und keine Einzelmessung.',
+    selfTest:
+      'Die Anzeige zeigt den Selbsttest beim Einschalten (alle Segmente leuchten) und keine Messung.',
     couldNotReadImage: 'Die Bilddaten konnten nicht gelesen werden.',
   },
 
