@@ -147,6 +147,7 @@ export type OcrWarning =
   | { code: 'implausibleValue'; field: OcrField; value: number; min: number; max: number }
   | { code: 'missingRows'; found: number }
   | { code: 'pulseUnreadable' }
+  | { code: 'selfTest' }
   | { code: 'isAverage' };
 
 export interface OcrResult {

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,8 +10,7 @@ import { formatOcrWarning } from '@/i18n/ocr';
 import { formatDate } from '@/lib/format';
 import { persistPhoto } from '@/services/scan';
 import { useAppState } from '@/state/AppState';
-import { takePendingScan } from '@/state/scanBuffer';
-import type { ScanOutcome } from '@/services/scan';
+import { clearScan, getScanJob, subscribeToScan } from '@/state/scanBuffer';
 import { Banner, Button, Card, EmptyState, Row } from '@/ui/components';
 import {
   draftProblem,
@@ -28,8 +27,10 @@ export default function ReviewScreen() {
   const insets = useSafeAreaInsets();
   const { addReading, settings, profile } = useAppState();
 
-  // Consumed once, on mount, so a back-navigation cannot re-apply a stale scan.
-  const [outcome] = useState<ScanOutcome | null>(() => takePendingScan());
+  // Watched rather than consumed: the reading is still running when this screen
+  // mounts, and it keeps running if the screen is closed. See state/scanBuffer.
+  const job = useSyncExternalStore(subscribeToScan, getScanJob, getScanJob);
+  const outcome = job?.status === 'done' ? job.outcome : null;
   const [draft, setDraft] = useState<ReadingDraft>(() => emptyDraft());
   const [saving, setSaving] = useState(false);
 
@@ -78,19 +79,95 @@ export default function ReviewScreen() {
     return null;
   }, [outcome, draft.measuredAt]);
 
-  if (!outcome) {
+  /**
+   * Still reading.
+   *
+   * The photo is shown at once so it is obvious the shutter worked and *which*
+   * shot is being read -- that was the whole complaint about the old flow. The
+   * two escapes matter as much as the spinner: a slow or unreachable assisted
+   * reader must never be a dead end, so typing the numbers and taking another
+   * photo are both available without waiting for it to finish.
+   */
+  if (job?.status === 'running') {
     return (
-      <View style={{ flex: 1, backgroundColor: theme.colors.background, padding: 16 }}>
+      <View style={{ flex: 1, backgroundColor: theme.colors.background, padding: 16, gap: 16 }}>
+        <Card padded={false} style={{ overflow: 'hidden' }}>
+          <Image
+            source={{ uri: job.sourceUri }}
+            style={{ width: '100%', height: 260 }}
+            resizeMode="cover"
+            accessibilityLabel={t.review.photoAlt}
+          />
+        </Card>
+        <Card>
+          <Row style={{ alignItems: 'center', gap: 12 }}>
+            <ActivityIndicator color={theme.colors.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ ...theme.typography.subheading, color: theme.colors.text }}>
+                {t.review.readingTitle}
+              </Text>
+              <Text style={{ ...theme.typography.caption, color: theme.colors.textFaint }}>
+                {settings.ocrServerUrl ? t.review.readingAssisted : t.review.readingOnDevice}
+              </Text>
+            </View>
+          </Row>
+        </Card>
+        <Row>
+          <Button
+            title={t.review.retake}
+            variant="ghost"
+            icon="camera-outline"
+            style={{ flex: 1 }}
+            onPress={() => {
+              clearScan();
+              router.replace('/scan');
+            }}
+          />
+          <Button
+            title={t.review.typeInstead}
+            variant="secondary"
+            icon="create-outline"
+            style={{ flex: 1 }}
+            onPress={() => {
+              clearScan();
+              router.replace('/entry');
+            }}
+          />
+        </Row>
+      </View>
+    );
+  }
+
+  if (!outcome) {
+    const failure = job?.status === 'failed' ? job.error : null;
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.background, padding: 16, gap: 16 }}>
+        {failure ? <Banner tone="danger" title={t.review.failTitle} message={failure} /> : null}
         <Card>
           <EmptyState
             icon="camera-outline"
-            title={t.review.nothingTitle}
-            message={t.review.nothingMessage}
+            title={failure ? t.review.failTitle : t.review.nothingTitle}
+            message={failure ? t.review.failMessage : t.review.nothingMessage}
             action={
-              <Button title={t.review.scanAgain} onPress={() => router.replace('/scan')} />
+              <Button
+                title={t.review.scanAgain}
+                onPress={() => {
+                  clearScan();
+                  router.replace('/scan');
+                }}
+              />
             }
           />
         </Card>
+        <Button
+          title={t.review.typeInstead}
+          variant="ghost"
+          icon="create-outline"
+          onPress={() => {
+            clearScan();
+            router.replace('/entry');
+          }}
+        />
       </View>
     );
   }
@@ -126,6 +203,7 @@ export default function ReviewScreen() {
       });
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      clearScan();
       router.dismissAll();
       router.replace('/(tabs)');
     } finally {
@@ -139,11 +217,19 @@ export default function ReviewScreen() {
       contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}
       keyboardShouldPersistTaps="handled"
     >
+      {outcome.assistedError ? (
+        <Banner tone="warning" message={t.review.assistedFellBack} />
+      ) : null}
+
       {result.ok ? (
         <Banner
           tone="success"
           title={t.review.okTitle}
-          message={t.review.okMessage}
+          message={
+            outcome.reader === 'assisted'
+              ? `${t.review.readByAssisted}. ${t.review.okMessage}`
+              : t.review.okMessage
+          }
         />
       ) : (
         <Banner
@@ -196,7 +282,10 @@ export default function ReviewScreen() {
           variant="ghost"
           icon="camera-outline"
           style={{ flex: 1 }}
-          onPress={() => router.replace('/scan')}
+          onPress={() => {
+            clearScan();
+            router.replace('/scan');
+          }}
         />
         <Button
           title={t.review.saveReading}

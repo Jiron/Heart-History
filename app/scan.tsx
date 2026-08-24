@@ -14,9 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { scanImage } from '@/services/scan';
+import { startScan } from '@/services/scanRunner';
 import { useTranslation } from '@/i18n';
-import { setPendingScan } from '@/state/scanBuffer';
+import { useAppState } from '@/state/AppState';
 import { Button } from '@/ui/components';
 import { useTheme } from '@/ui/ThemeProvider';
 
@@ -25,6 +25,7 @@ export default function ScanScreen() {
   const t = useTranslation();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const { settings } = useAppState();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [busy, setBusy] = useState(false);
@@ -36,41 +37,39 @@ export default function ScanScreen() {
   const frameWidth = Math.min(width - 48, 420);
   const frameHeight = frameWidth * 0.82;
 
-  const process = useCallback(async (uri: string) => {
-    setBusy(true);
-    setError(null);
-    try {
-      const outcome = await scanImage(uri);
-      setPendingScan(outcome);
-      Haptics.notificationAsync(
-        outcome.result.ok
-          ? Haptics.NotificationFeedbackType.Success
-          : Haptics.NotificationFeedbackType.Warning,
-      ).catch(() => {});
+  /**
+   * Hands the photo off and leaves. The reading continues in the background --
+   * see services/scanRunner.ts for why it must not be awaited here.
+   */
+  const handOff = useCallback(
+    (uri: string) => {
+      startScan(uri, { serverUrl: settings.ocrServerUrl }, t);
+      // A short buzz to confirm the shutter fired, since the viewfinder is about
+      // to disappear and there is no other feedback that it worked.
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       router.replace('/review');
-    } catch (e) {
-      setError(
-        e instanceof Error
-          ? t.scan.couldNotRead(e.message)
-          : t.scan.couldNotReadGeneric,
-      );
-    } finally {
-      setBusy(false);
-    }
-  }, [t]);
+    },
+    [settings.ocrServerUrl, t],
+  );
 
   const capture = useCallback(async () => {
     if (!cameraRef.current || busy) return;
+    setBusy(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.95,
         skipProcessing: false,
       });
-      if (photo?.uri) await process(photo.uri);
+      if (photo?.uri) handOff(photo.uri);
+      else setError(t.scan.noPicture);
     } catch {
       setError(t.scan.noPicture);
+    } finally {
+      // Only guards a double-press between the shutter firing and the screen
+      // going away; it is no longer how long the reading takes.
+      setBusy(false);
     }
-  }, [busy, process, t]);
+  }, [busy, handOff, t]);
 
   const pickFromLibrary = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -79,9 +78,9 @@ export default function ScanScreen() {
       allowsEditing: false,
     });
     if (!result.canceled && result.assets[0]?.uri) {
-      await process(result.assets[0].uri);
+      handOff(result.assets[0].uri);
     }
-  }, [process]);
+  }, [handOff]);
 
   if (!permission) {
     return (
@@ -208,14 +207,6 @@ export default function ScanScreen() {
         </Pressable>
       </View>
 
-      {busy ? (
-        <View style={styles.busyOverlay} pointerEvents="none">
-          <View style={styles.busyPill}>
-            <ActivityIndicator color="#fff" />
-            <Text style={styles.busyText}>{t.scan.reading}</Text>
-          </View>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -288,25 +279,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  busyOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  busyPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 999,
-  },
-  busyText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   errorWrap: {
     position: 'absolute',
     bottom: 240,

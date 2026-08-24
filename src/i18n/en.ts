@@ -65,6 +65,9 @@ export const en: Dictionary = {
     noReadingsTitle: 'No readings yet',
     noReadingsMessage:
       'Point the camera at your monitor and Heart History will read the numbers for you — or type them in by hand.',
+    scanRunning: 'Reading the display …',
+    scanReady: 'Reading ready to check',
+    scanFailed: 'Could not read the display',
     scanMonitor: 'Scan monitor',
     sevenDayAverage: '7-day average',
     sevenDayNote: (days: number, count: number) =>
@@ -167,6 +170,15 @@ export const en: Dictionary = {
     keepPhotos: 'Keep the photos',
     keepPhotosHint:
       'Stores each scanned picture with its reading so you can check it later. Uses more space.',
+    assistedReading: 'Assisted reading',
+    assistedReadingHint:
+      'Optional. Sends the photo to a vision model on your own machine, which reads the display far more reliably than this device can. The photo does not leave your network and the server keeps nothing. Leave empty to read only on the device.',
+    testConnection: 'Test connection',
+    save: 'Save',
+    serverReachable: 'Server reachable, model loaded.',
+    serverUnreachable: 'No answer. Check the address and port, and that both services are running.',
+    assistedReadingOn: (url: string) => `On: photos go to ${url}.`,
+    assistedReadingOff: 'Off: photos are read only on this device.',
     export: 'Export',
     reportPdf: "Doctor's report (PDF)",
     backupJson: 'Backup file (JSON)',
@@ -252,6 +264,13 @@ export const en: Dictionary = {
     nothingTitle: 'Nothing to review',
     nothingMessage: 'That scan has already been saved or dismissed.',
     scanAgain: 'Scan again',
+    readingTitle: 'Reading the display …',
+    readingOnDevice: 'Being read on this device.',
+    readingAssisted: 'Being read by your reading server.',
+    typeInstead: 'Type it in instead',
+    assistedFellBack:
+      'The reading server could not be reached, so the display was read on the device instead — which is markedly worse on difficult photos.',
+    readByAssisted: 'Read by your reading server',
   },
 
   form: {
@@ -376,6 +395,8 @@ export const en: Dictionary = {
       'The pulse could not be read reliably and was left out. Blood pressure was read.',
     isAverage:
       'The display shows the stored average (A), not a single measurement.',
+    selfTest:
+      'The display is showing the power-on self test (every segment lit), not a measurement.',
     couldNotReadImage: 'Could not read the image data.',
   },
 

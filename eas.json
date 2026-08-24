@@ -34,6 +34,18 @@
       "android": {
         "buildType": "apk"
       }
+    },
+    "assisted-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "autoIncrement": false,
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "HH_ALLOW_NETWORK": "1"
+      }
     }
   },
   "submit": {
