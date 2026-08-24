@@ -127,6 +127,28 @@ explicitly if you want to override it.
 
 ---
 
+## Through a Cloudflare tunnel
+
+Works, with one thing that has to be right.
+
+The app uploads the photo as a **multipart file part**, not as base64 inside
+JSON. That is not a style preference — measured against the same server and the
+same photograph, over the tunnel:
+
+```
+POST  Content-Type: image/jpeg                    -> 200
+POST  Content-Type: multipart/form-data           -> 200
+POST  {"image": "<440 KB of base64>"}             -> 403 Forbidden
+```
+
+The 403 is Cloudflare's, not this server's. A large base64 blob in a JSON field
+matches their managed rules for an attack payload, and no header talks them out
+of it. The symptom in the app is that every scan fails while *Test connection*
+succeeds, because the health check is a tiny GET and never trips the rule.
+
+If you see a 403 in the tunnel logs and 200 locally, this is why. Multipart is
+also a third smaller, since base64 inflates by 4/3.
+
 ## Access control
 
 Every request must carry `Authorization: Bearer <token>`. A missing token, a

@@ -225,7 +225,9 @@ export default function ReviewScreen() {
             // out, and the two look identical from the review screen otherwise.
             outcome.assistedError === 'unauthorised'
               ? t.review.assistedUnauthorised
-              : t.review.assistedFellBack
+              : outcome.assistedError === 'noNetworkPermission'
+                ? t.review.assistedNoPermission
+                : t.review.assistedFellBack
           }
         />
       ) : null}

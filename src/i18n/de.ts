@@ -190,6 +190,8 @@ export const de = {
       'Token abgelehnt. Hol dir das aktuelle mit «python server/ocr_server.py --show-token».',
     serverUnreachable:
       'Keine Antwort. Prüfe Adresse und Port und ob beide Dienste laufen.',
+    serverNoPermission:
+      'Diese App-Version hat gar keinen Netzwerkzugriff — unterstütztes Lesen funktioniert damit nicht. Bau sie mit «npm run build:apk:assisted».',
     assistedReadingOn: (url: string) => `Aktiv: Fotos gehen an ${url}.`,
     assistedReadingOff: 'Aus: Fotos werden ausschliesslich auf diesem Gerät gelesen.',
     export: 'Exportieren',
@@ -289,6 +291,8 @@ export const de = {
     typeInstead: 'Von Hand eintragen',
     assistedFellBack:
       'Der Lese-Server war nicht erreichbar — die Anzeige wurde auf dem Gerät gelesen, was bei schwierigen Fotos deutlich schlechter funktioniert.',
+    assistedNoPermission:
+      'Diese App-Version hat keinen Netzwerkzugriff, deshalb wurde auf dem Gerät gelesen. Für unterstütztes Lesen braucht es einen Build mit «npm run build:apk:assisted».',
     assistedUnauthorised:
       'Der Lese-Server hat das Token abgelehnt — die Anzeige wurde auf dem Gerät gelesen. Prüf das Token unter Einstellungen › Unterstütztes Lesen.',
     readByAssisted: 'Vom Lese-Server gelesen',

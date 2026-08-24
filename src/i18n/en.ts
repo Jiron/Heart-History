@@ -180,6 +180,8 @@ export const en: Dictionary = {
     serverUnauthorised:
       'Token rejected. Get the current one with "python server/ocr_server.py --show-token".',
     serverUnreachable: 'No answer. Check the address and port, and that both services are running.',
+    serverNoPermission:
+      'This build has no network access at all, so assisted reading cannot work. Build it with "npm run build:apk:assisted".',
     assistedReadingOn: (url: string) => `On: photos go to ${url}.`,
     assistedReadingOff: 'Off: photos are read only on this device.',
     export: 'Export',
@@ -278,6 +280,8 @@ export const en: Dictionary = {
     typeInstead: 'Type it in instead',
     assistedFellBack:
       'The reading server could not be reached, so the display was read on the device instead — which is markedly worse on difficult photos.',
+    assistedNoPermission:
+      'This build has no network access, so the display was read on the device. Assisted reading needs a build made with "npm run build:apk:assisted".',
     assistedUnauthorised:
       'The reading server rejected the token, so the display was read on the device. Check the token under Settings › Assisted reading.',
     readByAssisted: 'Read by your reading server',
