@@ -12,7 +12,7 @@ The brief, as agreed, plus the decisions taken while building. Anything marked
 | 3 | Must generalise, not be tuned to the four sample photos | Done |
 | 4 | History, charts, trends | Planned |
 | 5 | Local storage, backup, export, import | Planned |
-| 6 | **Everything client-side. No server.** | Done |
+| 6 | **Everything client-side. No server.** | Done — the shipping build. See below |
 | 7 | Filter by last week / month / year / all, and between two dates | Planned |
 | 8 | Add an entry fully manually, without a photo | Planned |
 | 9 | Edit any individual entry after the fact | Planned |
@@ -34,14 +34,41 @@ This is enforced structurally rather than promised:
   photo anywhere, so the guarantee is held by the operating system rather than by
   our good intentions. Verify with `npx expo config --type introspect`, or
   `aapt dump permissions` on a built APK.
-- The sole exception is the `development` build profile, which needs the network
-  to reach the Metro bundler. It is a debug artefact and is never distributed.
-- No code in `src/` or `app/` calls `fetch`, `XMLHttpRequest` or `WebSocket`.
+- Two profiles are exempt. `development` needs the network to reach the Metro
+  bundler and is never distributed. `assisted-apk` is discussed below.
+- The only code in `src/` that calls `fetch` is `services/remoteOcr.ts`, and it
+  is unreachable unless the user has typed a server address into Settings.
 - Photos, readings and backups live in app-private storage. Exports are written
   to a file the user explicitly shares.
 
 There is therefore no "processing job" to delete from a server, because no
 photo ever leaves the device.
+
+### Where requirement 6 was relaxed, and why
+
+Requirement 3 said the reader must generalise rather than be tuned to the four
+sample photographs. Measured against twenty-three photographs taken normally, the
+on-device recogniser read **one**. It is not tuned to the samples — it fails on
+them honestly and refuses — but it does not work, and the number is in
+[ocr.md](ocr.md).
+
+Requirements 3 and 6 turned out to be in tension, and this is the resolution:
+
+- **The default build still satisfies 6 completely.** `preview`, `production` and
+  `production-apk` have no `INTERNET` permission. Nothing changed for anyone who
+  does not go looking.
+- **A separate `assisted-apk` build** can send the photo to a vision model on a
+  machine the user runs, which reads those photographs. It is a different binary,
+  not a setting, so that the guarantee for the default build stays enforced by
+  Android rather than by this codebase's good behaviour.
+- **The server stores nothing.** It holds one photo in memory for one request and
+  returns three numbers. That is a property of code the user runs themselves,
+  which is a weaker kind of assurance than a missing permission, and it is
+  described that way everywhere it appears.
+
+The honest summary: requirement 6 holds for the app as shipped, and the user may
+opt out of it for themselves, on their own hardware, having been told the cost.
+[assisted-reading.md](assisted-reading.md) is the full account.
 
 ## Languages
 

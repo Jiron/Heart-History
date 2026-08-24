@@ -38,10 +38,15 @@ Hermes and in Node under the test suite, which is what makes it testable at all.
 
 `app.config.ts` strips `android.permission.INTERNET` from the manifest of every
 released build, so the guarantee is enforced by Android rather than by our good
-intentions — the app is *incapable* of making a network request. (The one
-exception is a development build, which needs to reach the Metro bundler; it is
-never shipped.) Photos, readings and backups live in app-private storage; an
-export only leaves the device when you pick a destination in the share sheet.
+intentions — the app is *incapable* of making a network request. Photos, readings
+and backups live in app-private storage; an export only leaves the device when
+you pick a destination in the share sheet.
+
+Two builds are exempt, both opt-in and neither the default. A **development**
+build has to reach the Metro bundler to load JavaScript at all. And an
+**`assisted-apk`** build can reach a reading server you run yourself — see
+[assisted reading](#assisted-reading) below, which is a real trade and is
+described as one. `preview`, `production` and `production-apk` are unchanged.
 
 ## How well does it read a display?
 
@@ -77,12 +82,40 @@ segment reads as lit:
 reads. That is the column that matters: a blood-pressure log which silently
 records a number you did not measure is worse than one that asks you to check.
 
-The accept rate on the real photos is the honest caveat. All three are hard
-shots — a stored-average screen caught mid-fade, an LCD dimming across its own
-panel, a shadow lying diagonally over the glass — and on those the app reads the
-display about a quarter of the time and asks you to confirm the rest. A squarely
-lit photo behaves like the `clean` and `typical` rows above. See
-[docs/ocr.md](docs/ocr.md) for how it works and why it fails safe.
+### And where it stops working
+
+Twenty-three later photographs, taken the way a person actually takes them —
+monitor small in frame, at an angle, lit by a phone torch — were read through
+the same four chains:
+
+```
+runs 92   accepted 4   correct 4   WRONG 0
+```
+
+**One photograph out of twenty-three.** Still nothing wrong, but as a reader,
+on the input that matters, it does not work. The cause is structural rather than
+a matter of tuning: nothing in the pipeline finds the display or corrects
+perspective, so a panel at a tenth of the frame and twenty degrees never reaches
+the code that reads digits. [docs/ocr.md](docs/ocr.md) has the detail.
+
+## Assisted reading
+
+Optional, off by default, and it needs a machine of your own. A vision model
+running locally reads those same photographs:
+
+| | On device | Assisted |
+|---|---|---|
+| Photos read | 1 of 23 | **24 of 27** |
+| Blood pressure wrong | 0 | **0** |
+| Time per photo | under a second | about 11 seconds |
+| Needs a network | no | yes, to your own machine |
+
+Each photo is read four times, from four renderings, and a value is accepted only
+if all of them agree — not by majority, because on the hardest photo the majority
+was wrong. That is what keeps the wrong column at zero.
+Setup is in [server/README.md](server/README.md); the reasoning, including what
+was tried and discarded, is in
+[docs/assisted-reading.md](docs/assisted-reading.md).
 
 ## Building an APK
 
@@ -98,7 +131,8 @@ Full instructions, including local builds and Play Store bundles, are in
 | | |
 |---|---|
 | [requirements.md](docs/requirements.md) | The brief, and the decisions taken against it |
-| [ocr.md](docs/ocr.md) | How the display recogniser works |
+| [ocr.md](docs/ocr.md) | How the on-device recogniser works, and where it stops |
+| [assisted-reading.md](docs/assisted-reading.md) | The local vision model: what was tried, measured and rejected |
 | [architecture.md](docs/architecture.md) | Project layout and data model |
 | [building.md](docs/building.md) | Running, testing and shipping |
 | [roadmap.md](docs/roadmap.md) | Ideas worth building next |

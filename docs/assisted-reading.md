@@ -1,0 +1,228 @@
+# Assisted reading: what was tried, and what it cost
+
+A record of how the photo-to-numbers problem was actually attacked, including
+the parts that did not work. Setup instructions live in
+[`server/README.md`](../server/README.md); this page is the reasoning.
+
+---
+
+## The problem, stated honestly
+
+Twenty-three photographs of a Microlife BP B1, taken the way a person takes
+them — monitor small in frame, held at an angle, sometimes lit by a phone
+torch, sometimes slightly out of focus. Two known readings, `106/88/104` and
+`107/78/98`.
+
+The on-device recogniser, given every one of them through four preprocessing
+chains:
+
+```
+runs 92   accepted 4   correct 4   WRONG 0
+```
+
+**One photograph out of twenty-three.** All four accepts came from the same
+image. This matches what happens on the phone, which is the point of measuring
+it this way.
+
+Two things are worth separating out of that number. The recogniser never
+produced a *wrong* reading, which is the failure that actually matters and the
+one it was designed around. And it is not badly tuned — it scores 100% on the
+synthetic benchmark from clean through brutal, and reads the three original
+fixtures. It is solving a different problem from the one the photographs pose.
+
+---
+
+## Why it is structural, not a tuning problem
+
+`src/ocr/` works like this: threshold the image adaptively, label connected
+components of ink, group them into horizontal bands, pick the three that look
+like value rows, cut each into right-anchored digit cells, and probe seven fixed
+windows per cell.
+
+Every step after the first assumes **the panel is most of the picture and
+roughly square-on**. When the monitor occupies a tenth of the frame at twenty
+degrees:
+
+- Adaptive thresholding picks a window size from the image, not the panel. At a
+  tenth of the frame the window spans several digits, so the local mean sits
+  inside the glyphs and the strokes stop separating from the background.
+- Row banding assumes rows are horizontal. At twenty degrees the bottom of `106`
+  overlaps the top of `88` in y, and they merge into one band.
+- Digit cells are axis-aligned rectangles. Under perspective the cell drifts off
+  the glyph across the row, so the rightmost digit is probed in the wrong place.
+
+The multi-pass ladder — ten combinations of threshold window, pre-blur,
+sensitivity and line-severing — varies parameters *downstream* of a step that
+has already failed. That is why more passes never helped: there is no setting of
+a probe window that recovers a row which was never located.
+
+Fixing it properly means panel detection and perspective correction: find the
+LCD quadrilateral, warp it to a rectangle, then run the existing reader on the
+result. That is a real and well-understood approach and it is **not attempted
+here** — it is a substantial piece of computer vision to write from scratch in
+TypeScript with no OpenCV, and the fallback below reads these photographs today.
+If the assisted reader is ever unacceptable, this is the direction to go, and
+the existing segment reader is worth keeping as the second half of it.
+
+---
+
+## What was tried before this
+
+Recorded so nobody repeats them. Details and measurements are in
+[`ocr.md`](./ocr.md).
+
+| Attempt | Outcome |
+|---|---|
+| Widening the multi-pass ladder | No change on the 23 photos. Downstream of the failure. |
+| Deskew by estimating glyph shear | **Harmful.** Measured 0.000 shear on all four original photos — the font is not italic, which was an assumption made from looking rather than measuring. Cost a third of the runtime and lost accuracy. Deleted; the note survives in `layout.ts`. |
+| Global contrast normalisation | No change on synthetic, slightly worse on real. Deleted. |
+| Severing the panel border (`removeThinLines`) | **Kept.** Real fix for a real bug — the border thresholded as ink and bridged into digits. |
+| Per-row merging across passes (`mergeBestRows`) | **Kept.** Different rows genuinely resolve best under different parameters. |
+| Stroke width from detected glyph height | **Kept.** Fixed a feedback loop where a bad stroke estimate produced a bad glyph estimate. |
+
+The last three are why the synthetic scores are what they are. None of them
+moved the 23-photo number, because none of them addresses localisation.
+
+---
+
+## The vision model
+
+A vision-language model does not need the panel found for it. Given the same
+photographs with nothing but a downscale:
+
+**Reference run** — Qwen3-VL-27B (the model that happened to be loaded), one
+reading per photo, no consensus:
+
+| | |
+|---|---|
+| Exactly right | 19 of 23 |
+| Blood pressure wrong | **3** |
+| Pulse wrong | 1 |
+
+Nineteen of twenty-three, against one of twenty-three. But the three wrong
+readings are the problem, and they were all the same mistake.
+
+### The failure that mattered
+
+Three photographs of `106/88/104` came back as `106/80/104`. All three have a
+hard shadow edge falling across the DIA row, washing out the middle bar of the
+second `8`. On a seven-segment display `8` and `0` differ by exactly that bar.
+
+The model was not hedging. It returned `80`, confidently, with no signal that
+anything was uncertain — which is the one failure mode this app cannot absorb.
+A refusal costs a manual entry. A confident wrong number lands in a medical
+history where nothing later questions it.
+
+### The fix: make it disagree with itself
+
+Each photo is read **four times**, from four renderings — plain, autocontrast,
+unsharp-masked, and histogram-equalised — and a value is accepted only if the
+readings agree. Not a majority: **any** disagreement refuses.
+
+The reasoning is specific rather than general. A segment that is genuinely lit
+reads the same under all four. A bar that only looked absent because of where a
+shadow boundary fell does not, because the renderings move that boundary
+differently. Disagreement is therefore a direct measurement of exactly the
+ambiguity that produced `88` → `80`, and it is available without knowing which
+reading is right.
+
+That last part is why it is not a vote. On the worst of the three shadow photos
+the renderings split 2–1 *for the wrong answer*: plain and autocontrast both said
+`80`, sharp said `88`. A majority would have confidently returned `80`. Refusing
+on disagreement returns nothing, which is correct.
+
+`consensus()` in [`server/ocr_server.py`](../server/ocr_server.py).
+
+### Measured, with 8B on an RTX 3060
+
+Qwen3-VL-8B-Instruct Q4_K_M, four renderings, all 27 fixtures:
+
+| | Device reader | 27B, one look | 8B, four renderings |
+|---|---|---|---|
+| Produced a reading | 1 of 23 | 23 of 23 | 23 of 27 |
+| Fully correct | 1 | 19 | 24 |
+| **Blood pressure wrong** | 0 | **3** | **0** |
+| Pulse wrong | 0 | 1 | **0** |
+| Time per photo | under 1 s | ~30 s | ~11 s |
+
+The 8B with consensus beats the far larger model on the only column that must
+never move, and it is three times faster. Every refusal is a specific rule
+firing:
+
+| Photo | What happened |
+|---|---|
+| `185311` | Renderings split on DIA, `80` vs `88`. Refused. |
+| `185306` | Renderings split on SYS, `126` vs `106`. Refused. |
+| `171545` | Renderings split on DIA. Refused. |
+| `185308` | Heavy glare over the PUL row; pulse dropped, blood pressure read and correct. |
+| self test | All segments lit, reported and refused. |
+
+`185308` is the one that shaped the fourth rendering. With three, all of them
+read that washed-out pulse row as `74` and the server returned it — the display
+said `104`. Histogram equalisation reads it as `88`. Neither is right and the row
+is not recoverable, but the two now disagree, and disagreement is what turns a
+confident wrong number into a dropped field.
+
+---
+
+## Refusal rules
+
+The wrapper enforces these regardless of what the model says, because a language
+model asked for numbers will produce numbers:
+
+- Values outside plausible ranges are dropped (`SYS 60-260`, `DIA 30-200`,
+  `PUL 30-220`).
+- A diastolic at or above its systolic voids **both**. One of the two was
+  misread and there is no way to tell which.
+- Any rendering reporting all segments lit refuses the whole photo — that is the
+  power-on self test, not a measurement.
+- Systolic and diastolic are all-or-nothing. Pulse may be dropped on its own,
+  because a missing pulse is worth much more than a wrong one.
+
+---
+
+## What it costs
+
+Not free, and the trade is real:
+
+- **It is not on the phone.** It needs a machine on your network running two
+  processes. Away from home, the app falls back to the device reader.
+- **It needs network permission.** Released builds have `INTERNET` stripped by
+  Android. Assisted reading requires the separate `assisted-apk` profile, so the
+  guarantee changes from "cannot reach a network" to "reaches the address you
+  typed". That is a downgrade, and it is why this is opt-in and why it is a
+  different binary rather than a setting.
+- **It is slower.** About eleven seconds for a full four-rendering read on an
+  RTX 3060, against a fraction of a second on device. This is why the camera no
+  longer waits — see `state/scanBuffer.ts`.
+
+---
+
+## Things not worth trying again
+
+- **Prompting harder on its own.** The prompt does now name the middle-bar
+  confusion explicitly, and that is worth keeping, but it did not by itself stop
+  a confident misread. Consensus did.
+- **Temperature above zero.** Sampling makes the same photo give different
+  answers between runs, which makes a reading impossible to trust and a bug
+  impossible to reproduce. Greedy, `top_k 1`, always.
+- **Trusting `display_legible`.** The model reports it and it correlates weakly
+  with being right. It is not used as a gate; the plausibility rules and the
+  consensus check are.
+- **Bigger images.** The vision tower resamples to its own grid. Above 1280 on
+  the long side, nothing changes except decode time.
+
+---
+
+## Where to go next
+
+In rough order of value:
+
+1. **More photographs.** Both folders show one reading each, which cannot catch
+   a digit-specific bias — `8` vs `0` was found only because it happened to be
+   in the data. A folder per reading, named `sys-dia-pul`, is picked up by
+   `tools/vlm-grade.py` and the test suite automatically.
+2. **Panel detection and perspective correction on the device**, feeding the
+   existing segment reader. This is the only path to good offline reading.
+3. **A smaller model.** 8B was chosen to sit under 8 GB of VRAM. A 4B may well
+   read digits this large just as reliably, at a third of the latency.

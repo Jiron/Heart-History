@@ -111,7 +111,9 @@ export default function ScanScreen() {
             textAlign: 'center',
           }}
         >
-          {t.scan.permissionMessage}
+          {settings.ocrServerUrl
+            ? t.scan.permissionMessageAssisted
+            : t.scan.permissionMessage}
         </Text>
         <Button title={t.scan.allowCamera} onPress={requestPermission} />
         <Button title={t.scan.choosePhoto} variant="ghost" onPress={pickFromLibrary} />

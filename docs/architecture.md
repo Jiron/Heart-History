@@ -18,15 +18,19 @@ src/
   services/               scan (image to reading), backup, PDF report
     reportHtml.ts         the report's markup — no platform imports, so it can
                           be rendered and inspected in Node
-  state/                  app-wide state and the scan hand-off
+    remoteOcr.ts          optional assisted reader, off unless configured
+    scanRunner.ts         starts a read that outlives the screen that began it
+  state/                  app-wide state and the running scan
   i18n/                   dictionaries (German is the source of truth)
     locale.ts             the active locale, with no React or Expo imports
   ui/                     design tokens, primitives, reading widgets
   charts/                 SVG charts built on react-native-svg
   lib/                    ids and formatting
 
+server/                   optional, runs on your machine, not shipped in the app
 tools/                    dev only: synthetic renderer, augmentation, benchmarks
   fixtures/               real photographs of the device, with expected values
+    <sys>-<dia>-<pul>/    a folder of photos all showing that one reading
 tests/                    vitest suites
 docs/                     this
 ```
@@ -42,6 +46,10 @@ instead of a camera, so the benchmark numbers describe the code that actually
 ships rather than a reimplementation of it. Every layer that *does* need a platform sits outside it:
 `services/scan.ts` is the only place that knows about `expo-image-manipulator`
 and `jpeg-js`.
+
+The [assisted reader](./assisted-reading.md) sits outside it too, and returns the
+same `OcrResult` shape, so nothing downstream of `services/scan.ts` knows or
+cares which of the two answered.
 
 ## Data
 
@@ -88,10 +96,26 @@ with the error captured but nothing mounted to show it. `BootGate` in
 [`app/_layout.tsx`](../app/_layout.tsx) renders the loading state, a readable
 error with a retry, or the app.
 
-Scan results pass from the camera to the review screen through a module-level
-slot ([`state/scanBuffer.ts`](../src/state/scanBuffer.ts)) rather than router
-params — an `OcrResult` does not belong in a URL. The review screen consumes it
-on mount so a stale result can never be shown against a later photo.
+### A scan is a job, not a hand-off
+
+[`state/scanBuffer.ts`](../src/state/scanBuffer.ts) holds the scan that is
+currently being read, and screens subscribe to it. It is not a hand-off slot and
+it is not context, for the same reason in both cases: **a scan outlives the
+screen that started it.**
+
+It used to be a slot. The camera ran the recogniser, waited, and pushed the
+finished result to the review screen. That put the wait inside the camera, which
+stayed live behind a spinner — the shutter had fired but the viewfinder was still
+showing the monitor, and there was no way to tell whether you were meant to keep
+holding the phone steady. Everyone read it as "still taking the picture". With
+the assisted reader taking several seconds rather than a fraction of one, that
+went from confusing to unusable.
+
+Now the camera closes as soon as the shutter returns a file and
+[`services/scanRunner.ts`](../src/services/scanRunner.ts) carries on without it.
+The review screen shows progress if it is open; the dashboard shows a banner if
+it is not; and neither owns the work. An `OcrResult` does not belong in a URL
+either, but that was never the main reason.
 
 ## Rendering
 

@@ -44,3 +44,7 @@ example
 
 # tool output
 tools/out/
+
+# Python bytecode from the optional local server
+__pycache__/
+*.pyc
