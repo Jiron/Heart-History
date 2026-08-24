@@ -139,10 +139,54 @@ authenticate through it — the bearer token is what this server understands.
 
 ---
 
+## Which GPU
+
+Selected by name, not by index:
+
+```bash
+HH_VLM_GPU=igpu    powershell -ExecutionPolicy Bypass -File server/start-vlm.ps1
+```
+
+```bash
+HH_VLM_GPU=nvidia  powershell -ExecutionPolicy Bypass -File server/start-vlm.ps1
+```
+
+`igpu` is the default. An exact id (`Vulkan1`) also works if you know it.
+
+**Do not hardcode a device index.** llama.cpp's numbering is not stable — on this
+machine `--list-devices` reported `Vulkan0` as the RTX 3060 one hour and as the
+Radeon 8060S the next, with no change to the build or the hardware. That is why
+`start-vlm.ps1` resolves the id by matching the adapter name at every launch,
+and why it prints which one it picked.
+
+Measured over the full fixture set, four renderings per photo:
+
+| | Radeon 8060S (iGPU) | RTX 3060 |
+|---|---|---|
+| Per photo | ~16.6 s | ~11.0 s |
+| Produced a reading | 24 of 27 | 23 of 27 |
+| Fully correct | 25 of 27 | 24 of 27 |
+| **Blood pressure wrong** | **0** | **0** |
+| Discrete VRAM | none | ~7.4 GB |
+| Memory used | ~7 GB of the shared pool | none |
+
+The iGPU is about 50% slower. It also accepted one photo the discrete card
+refused, and **that is not evidence it is better** — it is one borderline image
+out of 27. The two backends compile their shaders differently and reduce in a
+different order, so logits differ in the last bits, and an image whose
+renderings were already on the edge of disagreeing can fall either way. Read it
+as noise, not as a reason to choose.
+
+What is not noise is the column that matters: zero wrong on both.
+
+So this is a resource decision, not a quality one. Since the read is a
+background job the camera no longer waits on, five seconds rarely decides
+anything. The iGPU leaves the 3060 completely free; the 3060 leaves system
+memory alone.
+
 ## Memory
 
-The requirement was that the model live in VRAM and that RAM not creep upwards
-with every request. Three flags in `start-vlm.ps1` carry that:
+Three flags carry the "VRAM only, and RAM must not creep" requirement:
 
 | Flag | Default | Why it is changed |
 |---|---|---|
@@ -150,18 +194,20 @@ with every request. Three flags in `start-vlm.ps1` carry that:
 | `--cache-ram 0` | `8192` MiB | **This is the one that matters.** llama.cpp parks a slot's KV state in host RAM when it is evicted, up to 8 GB by default. That is what makes RAM climb request after request. We never reuse a prompt between photos, so the cache buys nothing. |
 | `--n-gpu-layers 999` | varies | Anything left behind runs on the CPU, out of RAM. |
 
-Expect roughly **7 GB of VRAM** (5.0 weights + 1.2 projector + KV) and a
-resident set in the low hundreds of MB, flat across requests. llama.cpp still
-needs a little RAM per request to hold the decoded image before uploading it;
-that is transient and released.
+Measured, across roughly 150 requests: **working set 708 MB → 715 MB** on the
+discrete card, and **949 MB** on the iGPU. Flat either way. You will also see a
+private commit figure of about 8 GB; on Windows that is WDDM's mandatory
+system-memory backing store for video allocations, not a second copy. Watch the
+working set.
 
-If you would rather keep the 3060 free, `HH_VLM_DEVICE=Vulkan1` moves it to the
-Radeon iGPU, which has far more (shared) memory and is slower.
+That first flag is worth seeing the effect of. The 27B text model on this same
+machine, started without it, shows a **16 GB working set** — the whole weights
+file resident in the page cache. Same runtime, same GPU, one flag apart.
 
-> Check the device order before assuming: `llama-server.exe --list-devices`.
-> On this machine `Vulkan0` is the RTX 3060 and `Vulkan1` the Radeon 8060S.
-
----
+On the integrated GPU, "VRAM" *is* system memory: the 8060S carves its pool out
+of the same RAM everything else uses, so roughly 7 GB is spoken for while the
+server runs. That is not a leak and not a duplicate; it is what an iGPU is, and
+it is the real cost of the row above.
 
 ## What this costs you
 
