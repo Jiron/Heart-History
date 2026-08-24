@@ -335,6 +335,29 @@ row-height model, severing the panel border, per-row merging, confidence-weighte
 pass ranking — came from one of these four photos. None was visible in the
 synthetic set, which is the point of having them.
 
+### The viewfinder was lying
+
+Worth recording separately, because it made every photograph worse before any
+of the above got a chance to fail.
+
+expo-camera scales its preview to **FILL** the view it is given. The scan screen
+gave it the whole screen, so on a tall phone the preview showed a centre crop of
+the sensor's 4:3 frame — while `takePictureAsync` returned the entire 4:3 frame.
+The viewfinder was effectively zoomed in, and every photo came out **wider than
+it was framed**.
+
+That is not cosmetic here. Someone lining the monitor up inside the guide frame
+was getting a picture in which the monitor was smaller than they had aimed for,
+pushing it towards precisely the condition the recogniser cannot handle. The
+guide frame was also drawn over screen area that was not in the photograph,
+which made it actively misleading.
+
+The fix is in `app/scan.tsx`: pass `ratio`, which switches the preview from FILL
+to FIT, and lay the camera out in a container of the same 4:3 so the letterboxing
+is explicit rather than a crop. The guide frame moved inside that container. What
+is on screen is now what gets captured — verified on the emulator, where the
+still arrives as 960x1280.
+
 ### Where this approach runs out
 
 The four photographs above were taken to test the recogniser: the monitor fills

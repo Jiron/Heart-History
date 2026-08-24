@@ -34,7 +34,10 @@ export default function ScanScreen() {
 
   // The guide frame roughly matches the proportions of the monitor's LCD, so
   // filling it puts the digits at a size the recogniser handles comfortably.
-  const frameWidth = Math.min(width - 48, 420);
+  // Sized against the preview rather than the window, because the preview is
+  // letterboxed to the capture aspect ratio -- see the note in the tree below.
+  const previewWidth = width;
+  const frameWidth = Math.min(previewWidth - 48, 420);
   const frameHeight = frameWidth * 0.82;
 
   /**
@@ -124,28 +127,47 @@ export default function ScanScreen() {
 
   return (
     <View style={styles.container}>
-      <CameraView
-        ref={cameraRef}
-        style={StyleSheet.absoluteFill}
-        facing="back"
-        enableTorch={torch}
-        animateShutter={false}
-      />
+      {/*
+        The preview is deliberately letterboxed rather than filling the screen.
 
-      {/* Dimmed surround with a clear cut-out, so the frame reads as a target */}
-      <View style={styles.overlay} pointerEvents="box-none">
-        <View style={styles.dim} />
-        <View style={{ flexDirection: 'row' }}>
-          <View style={[styles.dim, { flex: 1 }]} />
-          <View style={{ width: frameWidth, height: frameHeight }}>
-            <Corner style={{ top: 0, left: 0 }} rotate="0deg" />
-            <Corner style={{ top: 0, right: 0 }} rotate="90deg" />
-            <Corner style={{ bottom: 0, right: 0 }} rotate="180deg" />
-            <Corner style={{ bottom: 0, left: 0 }} rotate="270deg" />
+        By default expo-camera scales the preview to FILL its view, so a
+        full-screen preview on a tall phone shows a centre crop of a 4:3 sensor
+        while `takePictureAsync` returns the whole 4:3 frame. The viewfinder
+        therefore looked zoomed in, and every photo came out wider than it was
+        framed -- which for this app is not cosmetic: the monitor ends up smaller
+        in the picture than the person aiming at it intended, and a panel that is
+        small in frame is exactly what the recogniser cannot read.
+
+        Passing `ratio` switches the preview to FIT, and the container below is
+        the same 4:3, so what is on screen is what the camera captures. The
+        guide frame sits inside that box for the same reason: a target drawn
+        over screen area that is not in the photograph would be a lie.
+      */}
+      <View style={styles.previewBox}>
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          ratio={CAPTURE_RATIO}
+          enableTorch={torch}
+          animateShutter={false}
+        />
+
+        {/* Dimmed surround with a clear cut-out, so the frame reads as a target */}
+        <View style={styles.overlay} pointerEvents="box-none">
+          <View style={styles.dim} />
+          <View style={{ flexDirection: 'row' }}>
+            <View style={[styles.dim, { flex: 1 }]} />
+            <View style={{ width: frameWidth, height: frameHeight }}>
+              <Corner style={{ top: 0, left: 0 }} rotate="0deg" />
+              <Corner style={{ top: 0, right: 0 }} rotate="90deg" />
+              <Corner style={{ bottom: 0, right: 0 }} rotate="180deg" />
+              <Corner style={{ bottom: 0, left: 0 }} rotate="270deg" />
+            </View>
+            <View style={[styles.dim, { flex: 1 }]} />
           </View>
           <View style={[styles.dim, { flex: 1 }]} />
         </View>
-        <View style={[styles.dim, { flex: 1.3 }]} />
       </View>
 
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
@@ -228,8 +250,18 @@ function Corner({
   );
 }
 
+/**
+ * Aspect ratio of both the preview and the still.
+ *
+ * 4:3 is the native shape of essentially every phone sensor; 16:9 is produced by
+ * cropping it, which throws away vertical field of view for no benefit here.
+ */
+const CAPTURE_RATIO = '4:3' as const;
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: '#000', justifyContent: 'center' },
+  // Portrait 4:3. Width drives it, so the box is as large as the screen allows.
+  previewBox: { width: '100%', aspectRatio: 3 / 4, justifyContent: 'center' },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'column' },
   dim: { backgroundColor: 'rgba(0,0,0,0.55)', flex: 1 },

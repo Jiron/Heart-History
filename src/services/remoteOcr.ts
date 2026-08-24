@@ -44,8 +44,17 @@ interface RemoteReading {
 
 export class RemoteOcrError extends Error {}
 
-/** Long enough for a cold model to load, short enough not to hang the review screen. */
-const TIMEOUT_MS = 45_000;
+/**
+ * Generous, because giving up early is the more expensive mistake.
+ *
+ * Four renderings take about eleven seconds on an RTX 3060 and rather longer on
+ * an integrated GPU, and the first request after the model loads is slower
+ * again. Since the read no longer blocks a screen -- it is a background job with
+ * "type it in" and "retake" both available throughout -- a long ceiling costs
+ * the user nothing, while a short one turns a slow answer into a wrong-looking
+ * failure and a pointless fallback to the weaker reader.
+ */
+const TIMEOUT_MS = 120_000;
 
 /**
  * Android 16 put local network access behind its own runtime permission.
