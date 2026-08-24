@@ -176,30 +176,33 @@ def extract_image(body: bytes, content_type: str) -> bytes:
     """
     Pulls the JPEG out of whichever envelope it arrived in.
 
-    Three are accepted, and the order matters because the app uses the first:
+    Three are accepted:
 
-      multipart/form-data   what the app sends. React Native streams the file
-                            through its native networking layer, so the bytes
-                            never become a JavaScript string.
-      image/jpeg (or any
-      other content type)   raw bytes. What curl sends, and the easiest way to
-                            test the server by hand.
-      application/json      {"image": "<base64>"}. Kept for compatibility, but
-                            see the warning below before using it.
+      raw bytes             what the app sends, and what `curl --data-binary`
+                            sends. Any content type that is not one of the two
+                            below is treated as the image itself.
+      multipart/form-data   an ordinary file upload, for anything that prefers
+                            to send one.
+      application/json      {"image": "<base64>"}. Kept for compatibility.
 
-    ## Why base64 JSON is no longer the app's path
+    ## Why the app settled on raw bytes
 
-    It works perfectly on a LAN and fails through a Cloudflare tunnel. Measured
-    against the same server and the same photograph:
+    The other two were each tried against the real deployment and each failed at
+    a different layer:
 
-        POST with Content-Type: image/jpeg        -> 200
-        POST with {"image": "<440 KB of base64>"} -> 403 Forbidden
+        {"image": "<440 KB of base64>"}  ->  403, from Cloudflare's managed
+            rules. A large base64 blob in a JSON field looks like an attack
+            payload to them, and no header talks them out of it.
 
-    The 403 comes from Cloudflare, not from here. A large base64 blob inside a
-    JSON field is a shape their managed rules treat as an attack payload, and
-    there is no header you can set to talk them out of it. A multipart file
-    upload is the ordinary shape for sending a photograph and passes cleanly --
-    and as a bonus it is a third smaller, since base64 inflates by 4/3.
+        FormData with { uri, name, type }  ->  never left the phone.
+            "Unsupported FormDataPart implementation". Expo SDK 54+ replaces the
+            global fetch with its own WinterCG implementation, which accepts a
+            string, a Blob, or an object with `bytes()` -- and not React Native's
+            object-with-a-uri file part, which is the shape every RN upload
+            example uses.
+
+    Raw bytes avoid both, and are the smallest of the three: no base64 inflation
+    and no multipart framing.
     """
     if content_type.startswith("multipart/form-data"):
         # Reconstruct just enough of a MIME document for the stdlib parser: it

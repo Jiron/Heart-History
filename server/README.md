@@ -131,23 +131,30 @@ explicitly if you want to override it.
 
 Works, with one thing that has to be right.
 
-The app uploads the photo as a **multipart file part**, not as base64 inside
-JSON. That is not a style preference — measured against the same server and the
-same photograph, over the tunnel:
+The app uploads the photo as **raw JPEG bytes**. Two other shapes were tried
+first, and each failed at a different layer:
 
 ```
-POST  Content-Type: image/jpeg                    -> 200
-POST  Content-Type: multipart/form-data           -> 200
-POST  {"image": "<440 KB of base64>"}             -> 403 Forbidden
+POST  Content-Type: image/jpeg           -> 200
+POST  multipart/form-data                -> 200 from curl, never sent by the app
+POST  {"image": "<440 KB of base64>"}    -> 403 Forbidden
 ```
 
-The 403 is Cloudflare's, not this server's. A large base64 blob in a JSON field
-matches their managed rules for an attack payload, and no header talks them out
-of it. The symptom in the app is that every scan fails while *Test connection*
-succeeds, because the health check is a tiny GET and never trips the rule.
+The **403** is Cloudflare's, not this server's: a large base64 blob in a JSON
+field matches their managed rules for an attack payload, and no header talks
+them out of it. The symptom is that every scan fails while *Test connection*
+succeeds, because the health check is a tiny GET that never trips the rule.
 
-If you see a 403 in the tunnel logs and 200 locally, this is why. Multipart is
-also a third smaller, since base64 inflates by 4/3.
+**Multipart** passes Cloudflare cleanly but never got that far from the app.
+Expo SDK 54+ replaces the global `fetch` with its own WinterCG implementation,
+which accepts a string, a `Blob`, or an object with `bytes()` — and *not* React
+Native's `{ uri, name, type }` file part, which is the shape every React Native
+upload example uses. It throws `Unsupported FormDataPart implementation` before
+a single byte leaves the phone. Worth knowing if you ever add an upload
+elsewhere in this app.
+
+Raw bytes avoid both, and are the smallest of the three: no base64 inflation,
+no multipart framing.
 
 ## Access control
 
@@ -435,7 +442,7 @@ for measuring the model alone and is not safe to run against.
 | | |
 |---|---|
 | `GET /health` | `{"ok": true}` when the model is loaded. 503 otherwise. |
-| `POST /read` | Body is either raw JPEG bytes with `Content-Type: image/jpeg`, or `{"image": "<base64>"}` as JSON. |
+| `POST /read` | Raw JPEG bytes (what the app sends), `multipart/form-data`, or `{"image": "<base64>"}` as JSON. |
 
 ```json
 {
