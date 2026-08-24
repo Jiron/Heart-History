@@ -7,9 +7,22 @@
   Listens on 127.0.0.1:6001 (loopback only). The phone never talks to this
   directly; it talks to ocr_server.py on port 6000, which forwards to here.
 
+  ## Choosing a GPU
+
+      $env:HH_VLM_GPU = 'igpu'     # Radeon 8060S — the default
+      $env:HH_VLM_GPU = 'nvidia'   # RTX 3060
+      $env:HH_VLM_GPU = 'Vulkan1'  # an exact device id, if you know it
+
+  Selected by *name*, not by index, and that is not fussiness. llama.cpp's
+  device numbering is not stable: on this machine `--list-devices` reported
+  Vulkan0 as the RTX 3060 one hour and as the Radeon the next, with no change to
+  the build or the hardware. Hardcoding `Vulkan0` therefore silently loads the
+  model onto whichever card happens to enumerate first, which is how you end up
+  wondering why it got slower. The id is resolved below, at every launch.
+
   ## Memory
 
-  Three flags carry the whole "VRAM only, and RAM must not creep" requirement:
+  Three flags carry the "VRAM only, and RAM must not creep" requirement:
 
     --load-mode dio   Reads the weights from disk straight into VRAM using
                       DirectIO. The default (mmap) leaves the whole 5 GB file
@@ -25,8 +38,10 @@
     --n-gpu-layers 999  Every layer on the GPU. Partial offload keeps the
                       remainder in RAM and computes it on the CPU.
 
-  Note llama.cpp still needs a little RAM per request to hold the decoded image
-  before it is uploaded. That is transient and released; it is not a leak.
+  Note that on the integrated GPU, "VRAM" *is* system memory — the 8060S carves
+  its pool out of the same RAM everything else uses. Roughly 7 GB will be spoken
+  for while the server runs. That is not a leak and not a second copy; it is
+  what an iGPU is. The discrete card is the option that leaves RAM alone.
 #>
 
 $ErrorActionPreference = 'Continue'
@@ -35,10 +50,8 @@ $LlamaServer = 'D:\AiApiStuff\runtime\llamacpp\llama-server.exe'
 $Model       = 'D:\AiApiStuff\models\Qwen3VL-8B-Instruct-Q4_K_M.gguf'
 $MMProj      = 'D:\AiApiStuff\models\mmproj-Qwen3VL-8B-Instruct-F16.gguf'
 
-# Vulkan0 is the RTX 3060; Vulkan1 is the Radeon 8060S iGPU. Check the current
-# order with: llama-server.exe --list-devices
-$Device = if ($env:HH_VLM_DEVICE) { $env:HH_VLM_DEVICE } else { 'Vulkan0' }
-$Port   = if ($env:HH_VLM_PORT)   { $env:HH_VLM_PORT }   else { '6001' }
+$Port = if ($env:HH_VLM_PORT) { $env:HH_VLM_PORT } else { '6001' }
+$Want = if ($env:HH_VLM_GPU)  { $env:HH_VLM_GPU }  else { 'igpu' }
 
 foreach ($path in @($LlamaServer, $Model, $MMProj)) {
   if (-not (Test-Path $path)) {
@@ -47,7 +60,33 @@ foreach ($path in @($LlamaServer, $Model, $MMProj)) {
   }
 }
 
-Write-Host "Qwen3-VL-8B on $Device, listening on 127.0.0.1:$Port" -ForegroundColor Cyan
+# Ask the runtime what it can see, right now, rather than trusting a note.
+$devices = @()
+foreach ($line in (& $LlamaServer --list-devices 2>&1)) {
+  if ("$line" -match '^\s*(\w+?\d+):\s*(.+?)\s*\(') {
+    $devices += [pscustomobject]@{ Id = $Matches[1]; Name = $Matches[2] }
+  }
+}
+
+if ($devices.Count -eq 0) {
+  Write-Error "No GPU devices reported by llama-server. Is the Vulkan runtime installed?"
+  exit 1
+}
+
+if ($Want -match '^\w+?\d+$' -and ($devices.Id -contains $Want)) {
+  $Device = $Want
+} else {
+  $pattern = if ($Want -eq 'nvidia') { 'NVIDIA|GeForce|RTX' } else { 'Radeon|AMD|Intel|Iris' }
+  $match = $devices | Where-Object { $_.Name -match $pattern } | Select-Object -First 1
+  if ($null -eq $match) {
+    Write-Error "No device matching '$Want'. Available: $(($devices | ForEach-Object { "$($_.Id) = $($_.Name)" }) -join '; ')"
+    exit 1
+  }
+  $Device = $match.Id
+}
+
+$chosen = $devices | Where-Object { $_.Id -eq $Device } | Select-Object -First 1
+Write-Host "Qwen3-VL-8B on $($chosen.Id) ($($chosen.Name)), listening on 127.0.0.1:$Port" -ForegroundColor Cyan
 
 & $LlamaServer `
   --model $Model `

@@ -243,8 +243,13 @@ Not free, and the trade is real:
   typed". That is a downgrade, and it is why this is opt-in and why it is a
   different binary rather than a setting.
 - **It is slower.** About eleven seconds for a full four-rendering read on an
-  RTX 3060, against a fraction of a second on device. This is why the camera no
-  longer waits — see `state/scanBuffer.ts`.
+  RTX 3060, or sixteen on the Radeon 8060S iGPU, against a fraction of a second
+  on device. This is why the camera no longer waits — see `state/scanBuffer.ts`.
+  Which GPU is a resource question rather than a quality one — zero wrong on
+  both, and the one-photo difference in accept rate is backend noise on a
+  borderline image, not a reason to choose. It comes down to whether you would
+  rather spend the discrete card or ~7 GB of shared system memory.
+  `server/README.md` has the comparison.
 
 ---
 
@@ -261,6 +266,11 @@ Not free, and the trade is real:
   consensus check are.
 - **Bigger images.** The vision tower resamples to its own grid. Above 1280 on
   the long side, nothing changes except decode time.
+- **Hardcoding a GPU index.** llama.cpp's device numbering is not stable —
+  `--list-devices` reported `Vulkan0` as the RTX 3060 one hour and as the Radeon
+  the next, same build, same hardware. `start-vlm.ps1` resolves the id by
+  matching the adapter name at launch and prints what it chose. A benchmark that
+  silently ran on the wrong card would look like a regression in the model.
 
 ---
 

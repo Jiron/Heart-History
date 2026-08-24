@@ -107,7 +107,7 @@ running locally reads those same photographs:
 |---|---|---|
 | Photos read | 1 of 23 | **24 of 27** |
 | Blood pressure wrong | 0 | **0** |
-| Time per photo | under a second | about 11 seconds |
+| Time per photo | under a second | 11 s on a 3060, 17 s on an iGPU |
 | Needs a network | no | yes, to your own machine |
 
 Each photo is read four times, from four renderings, and a value is accepted only
