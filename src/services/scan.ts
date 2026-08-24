@@ -64,6 +64,8 @@ export interface ScanConfig extends OcrOptions {
    * used if it cannot be reached. See services/remoteOcr.ts.
    */
   serverUrl?: string | null;
+  /** Bearer token the assisted reader requires. */
+  serverToken?: string | null;
 }
 
 /**
@@ -81,7 +83,7 @@ export async function scanImage(
   uri: string,
   config: ScanConfig = {},
 ): Promise<ScanOutcome> {
-  const { serverUrl, ...options } = config;
+  const { serverUrl, serverToken, ...options } = config;
   const useAssisted = typeof serverUrl === 'string' && serverUrl.trim().length > 0;
   const maxDim = useAssisted ? REMOTE_MAX_DIM : WORKING_MAX_DIM;
 
@@ -122,7 +124,7 @@ export async function scanImage(
 
   if (useAssisted) {
     try {
-      result = await readRemotely(saved.base64, serverUrl as string);
+      result = await readRemotely(saved.base64, serverUrl as string, serverToken ?? null);
       reader = 'assisted';
     } catch (error) {
       // Not fatal. The device recogniser is worse on hard photos but it is

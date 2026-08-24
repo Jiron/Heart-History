@@ -113,6 +113,13 @@ running locally reads those same photographs:
 Each photo is read four times, from four renderings, and a value is accepted only
 if all of them agree — not by majority, because on the hardest photo the majority
 was wrong. That is what keeps the wrong column at zero.
+
+The server keeps nothing: the photo lives in memory for one request, there is no
+database and no upload directory, and even the console line omits the values.
+History, photos and backups stay on the phone. Every endpoint requires a bearer
+token, generated on first run, so the server can safely sit behind a Cloudflare
+tunnel rather than only on the LAN.
+
 Setup is in [server/README.md](server/README.md); the reasoning, including what
 was tried and discarded, is in
 [docs/assisted-reading.md](docs/assisted-reading.md).

@@ -172,10 +172,13 @@ export const en: Dictionary = {
       'Stores each scanned picture with its reading so you can check it later. Uses more space.',
     assistedReading: 'Assisted reading',
     assistedReadingHint:
-      'Optional. Sends the photo to a vision model on your own machine, which reads the display far more reliably than this device can. The photo does not leave your network and the server keeps nothing. Leave empty to read only on the device.',
+      'Optional. Sends the photo to a vision model on your own machine, which reads the display far more reliably than this device can. The server keeps nothing. The address and token are shown when the server starts. Leave empty to read only on the device.',
     testConnection: 'Test connection',
     save: 'Save',
     serverReachable: 'Server reachable, model loaded.',
+    tokenPlaceholder: 'Access token',
+    serverUnauthorised:
+      'Token rejected. Get the current one with "python server/ocr_server.py --show-token".',
     serverUnreachable: 'No answer. Check the address and port, and that both services are running.',
     assistedReadingOn: (url: string) => `On: photos go to ${url}.`,
     assistedReadingOff: 'Off: photos are read only on this device.',
@@ -275,6 +278,8 @@ export const en: Dictionary = {
     typeInstead: 'Type it in instead',
     assistedFellBack:
       'The reading server could not be reached, so the display was read on the device instead — which is markedly worse on difficult photos.',
+    assistedUnauthorised:
+      'The reading server rejected the token, so the display was read on the device. Check the token under Settings › Assisted reading.',
     readByAssisted: 'Read by your reading server',
   },
 

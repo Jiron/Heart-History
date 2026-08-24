@@ -46,13 +46,17 @@ export default function ScanScreen() {
    */
   const handOff = useCallback(
     (uri: string) => {
-      startScan(uri, { serverUrl: settings.ocrServerUrl }, t);
+      startScan(
+        uri,
+        { serverUrl: settings.ocrServerUrl, serverToken: settings.ocrServerToken },
+        t,
+      );
       // A short buzz to confirm the shutter fired, since the viewfinder is about
       // to disappear and there is no other feedback that it worked.
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       router.replace('/review');
     },
-    [settings.ocrServerUrl, t],
+    [settings.ocrServerUrl, settings.ocrServerToken, t],
   );
 
   const capture = useCallback(async () => {

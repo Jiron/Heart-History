@@ -181,10 +181,13 @@ export const de = {
       'Speichert jedes gescannte Bild bei der Messung, damit du es später prüfen kannst. Braucht mehr Speicher.',
     assistedReading: 'Unterstütztes Lesen',
     assistedReadingHint:
-      'Optional. Schickt das Foto an ein Bildmodell auf deinem eigenen Rechner, das die Anzeige deutlich zuverlässiger liest als dieses Gerät. Das Foto verlässt dein Netzwerk nicht und wird auf dem Server nicht gespeichert. Leer lassen, um ausschliesslich auf dem Gerät zu lesen.',
+      'Optional. Schickt das Foto an ein Bildmodell auf deinem eigenen Rechner, das die Anzeige deutlich zuverlässiger liest als dieses Gerät. Das Foto wird dort nicht gespeichert. Adresse und Token stehen in server/token.txt bzw. werden beim Start angezeigt. Leer lassen, um ausschliesslich auf dem Gerät zu lesen.',
     testConnection: 'Verbindung testen',
     save: 'Speichern',
     serverReachable: 'Server erreichbar, Modell geladen.',
+    tokenPlaceholder: 'Zugriffs-Token',
+    serverUnauthorised:
+      'Token abgelehnt. Hol dir das aktuelle mit «python server/ocr_server.py --show-token».',
     serverUnreachable:
       'Keine Antwort. Prüfe Adresse und Port und ob beide Dienste laufen.',
     assistedReadingOn: (url: string) => `Aktiv: Fotos gehen an ${url}.`,
@@ -286,6 +289,8 @@ export const de = {
     typeInstead: 'Von Hand eintragen',
     assistedFellBack:
       'Der Lese-Server war nicht erreichbar — die Anzeige wurde auf dem Gerät gelesen, was bei schwierigen Fotos deutlich schlechter funktioniert.',
+    assistedUnauthorised:
+      'Der Lese-Server hat das Token abgelehnt — die Anzeige wurde auf dem Gerät gelesen. Prüf das Token unter Einstellungen › Unterstütztes Lesen.',
     readByAssisted: 'Vom Lese-Server gelesen',
   },
 

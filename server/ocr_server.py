@@ -6,6 +6,20 @@ Reads a blood-pressure display out of a photo, using a local vision model.
 Listens on 0.0.0.0:6000 so a phone on the same network can reach it, and
 forwards to llama-server on 127.0.0.1:6001 (started by start-vlm.ps1).
 
+## Access
+
+Every request must carry `Authorization: Bearer <token>`. Anything without it --
+wrong token, missing header, unknown path -- gets the same 401, so an
+unauthenticated caller cannot even confirm what this is. The token is generated
+on first run into server/token.txt (gitignored); print it with:
+
+    python server/ocr_server.py --show-token
+
+This matters because the intended deployment puts the server behind a public
+hostname via a Cloudflare tunnel. On a LAN the network was the boundary; through
+a tunnel there is no network boundary left, and the token is the only thing
+between a stranger and free use of your GPU.
+
 ## What this keeps
 
 The photo exists as bytes in memory for the length of one request and is then
@@ -31,9 +45,11 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hmac
 import io
 import json
 import os
+import secrets
 import sys
 import time
 import urllib.error
@@ -43,6 +59,47 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from PIL import Image, ImageFilter, ImageOps
 
 VLM_URL = os.environ.get("HH_VLM_URL", "http://127.0.0.1:6001/v1/chat/completions")
+
+TOKEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "token.txt")
+
+
+def load_or_create_token() -> str:
+    """
+    The shared secret every request must present.
+
+    Taken from HH_OCR_TOKEN if set, otherwise from server/token.txt, otherwise
+    generated once and written there. Generating rather than defaulting is
+    deliberate: a server with a well-known default password is worse than one
+    with none, because it looks protected.
+
+    `token_urlsafe(32)` is 256 bits from the OS entropy source. That is not
+    guessable, so the only realistic way to lose it is to leak it -- which is
+    why it is never logged, never echoed in an error, and why token.txt is
+    gitignored.
+    """
+    from_env = os.environ.get("HH_OCR_TOKEN", "").strip()
+    if from_env:
+        return from_env
+
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE, encoding="utf-8") as handle:
+            existing = handle.read().strip()
+        if existing:
+            return existing
+
+    created = secrets.token_urlsafe(32)
+    with open(TOKEN_FILE, "w", encoding="utf-8") as handle:
+        handle.write(created + "\n")
+    try:
+        os.chmod(TOKEN_FILE, 0o600)
+    except OSError:
+        # Windows ignores POSIX modes. The file is in the user's own directory,
+        # which is the protection that actually applies there.
+        pass
+    return created
+
+
+TOKEN = load_or_create_token()
 
 # The vision tower resamples to its own grid, so pixels beyond this buy nothing
 # and cost decode time.
@@ -312,7 +369,34 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _authorised(self) -> bool:
+        """
+        Constant-time check of the bearer token.
+
+        `compare_digest` rather than `==` because a plain comparison returns as
+        soon as it finds a differing byte, and the time that takes is
+        measurable over a network -- enough to recover a secret one byte at a
+        time. Cheap to avoid, so avoid it.
+        """
+        header = self.headers.get("Authorization", "")
+        presented = header[7:].strip() if header.startswith("Bearer ") else ""
+        return hmac.compare_digest(presented, TOKEN)
+
+    def _reject(self) -> None:
+        """
+        The single response to anything that is not authorised.
+
+        Identical for a missing token, a wrong token and an unknown path, so a
+        caller without the secret cannot use the difference to learn what this
+        server is or which routes it has. Once past this, real 404s are fine --
+        by then you already hold the token.
+        """
+        self._send(401, {"error": "unauthorised"})
+
     def do_GET(self) -> None:  # noqa: N802
+        if not self._authorised():
+            self._reject()
+            return
         if self.path == "/health":
             try:
                 probe = VLM_URL.replace("/v1/chat/completions", "/health")
@@ -325,6 +409,16 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "not found"})
 
     def do_POST(self) -> None:  # noqa: N802
+        if not self._authorised():
+            # Drain the body first. Without this the client is still writing a
+            # multi-megabyte upload when the socket closes, and it sees a
+            # connection reset rather than the 401 that explains the problem.
+            pending = int(self.headers.get("Content-Length", "0") or 0)
+            while pending > 0:
+                pending -= len(self.rfile.read(min(pending, 65536)))
+            self._reject()
+            return
+
         if self.path != "/read":
             self._send(404, {"error": "not found"})
             return
@@ -382,18 +476,40 @@ class Handler(BaseHTTPRequestHandler):
         ]
         self._send(200, result)
 
-        sys.stderr.write(
-            "read %dx%d -> %s/%s/%s ok=%s in %dms\n"
-            % (
-                image.width,
-                image.height,
-                result["systolic"],
-                result["diastolic"],
-                result["pulse"],
-                result["ok"],
-                result["elapsedMs"],
+        # Deliberately without the values.
+        #
+        # This server is not a place readings are kept, and a console line is one
+        # `> server.log` away from being exactly that. What is useful for
+        # operating it -- did a request arrive, was it accepted, how long did it
+        # take -- carries none of the measurement. The numbers go to the phone
+        # that asked for them and nowhere else.
+        #
+        # --debug-dir already means "I am working on this and want frames kept",
+        # so that is the one mode where the values are printed too.
+        if self.debug_dir:
+            sys.stderr.write(
+                "read %dx%d -> %s/%s/%s ok=%s in %dms\n"
+                % (
+                    image.width,
+                    image.height,
+                    result["systolic"],
+                    result["diastolic"],
+                    result["pulse"],
+                    result["ok"],
+                    result["elapsedMs"],
+                )
             )
-        )
+        else:
+            sys.stderr.write(
+                "read %dx%d  %s  %s  in %dms\n"
+                % (
+                    image.width,
+                    image.height,
+                    "accepted" if result["ok"] else "refused",
+                    "pulse dropped" if result["ok"] and result["pulse"] is None else "",
+                    result["elapsedMs"],
+                )
+            )
 
     def log_message(self, *args) -> None:
         # The default logs every request line to stderr; the summary above is
@@ -416,13 +532,25 @@ def main() -> None:
         default=None,
         help="Keep the downscaled frames here. Off by default; the app never sets it.",
     )
+    parser.add_argument(
+        "--show-token",
+        action="store_true",
+        help="Print the access token and exit, for copying into the app.",
+    )
     args = parser.parse_args()
+
+    if args.show_token:
+        print(TOKEN)
+        return
 
     Handler.debug_dir = args.debug_dir
     Handler.passes = args.passes
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print("OCR server on http://%s:%d  ->  %s" % (args.host, args.port, VLM_URL))
     print("%d rendering(s) per photo, agreement required" % args.passes)
+    # Shown truncated. Enough to tell at a glance whether the app holds the same
+    # one, without putting the secret into a terminal buffer or a screenshot.
+    print("token %s… (full value: python server/ocr_server.py --show-token)" % TOKEN[:6])
     if args.debug_dir:
         print("WARNING: keeping frames in %s" % args.debug_dir)
     try:

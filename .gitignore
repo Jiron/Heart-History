@@ -48,3 +48,6 @@ tools/out/
 # Python bytecode from the optional local server
 __pycache__/
 *.pyc
+
+# The assisted reader's access token — generated per machine, never shared
+server/token.txt

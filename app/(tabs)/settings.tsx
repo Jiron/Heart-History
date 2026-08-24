@@ -8,7 +8,7 @@ import { presetRange } from '@/domain/statistics';
 import type { Settings } from '@/domain/types';
 import { dictionaryFor, LANGUAGES, useTranslation } from '@/i18n';
 import { exportBackup, exportCsv, importBackup, type ImportMode } from '@/services/backup';
-import { checkServer } from '@/services/remoteOcr';
+import { checkServer, type ServerCheck } from '@/services/remoteOcr';
 import { exportReport } from '@/services/report';
 import { useAppState } from '@/state/AppState';
 import { Banner, Button, Card, Chip, Row, SectionHeader } from '@/ui/components';
@@ -21,7 +21,8 @@ export default function SettingsScreen() {
   const { settings, updateSettings, readings, profile, profiles, refresh } = useAppState();
   const [busy, setBusy] = useState<string | null>(null);
   const [serverDraft, setServerDraft] = useState(settings.ocrServerUrl ?? '');
-  const [serverState, setServerState] = useState<'unknown' | 'ok' | 'down'>('unknown');
+  const [tokenDraft, setTokenDraft] = useState(settings.ocrServerToken ?? '');
+  const [serverState, setServerState] = useState<ServerCheck | 'unknown'>('unknown');
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(
     null,
   );
@@ -186,11 +187,32 @@ export default function SettingsScreen() {
             setServerDraft(text);
             setServerState('unknown');
           }}
-          placeholder="192.168.1.20:6000"
+          placeholder="heart.example.dev"
           placeholderTextColor={theme.colors.textFaint}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
+          style={[
+            styles.serverInput,
+            {
+              backgroundColor: theme.colors.surfaceSunken,
+              color: theme.colors.text,
+              borderColor: theme.colors.border,
+            },
+          ]}
+        />
+        <TextInput
+          value={tokenDraft}
+          onChangeText={(text) => {
+            setTokenDraft(text);
+            setServerState('unknown');
+          }}
+          placeholder={t.settings.tokenPlaceholder}
+          placeholderTextColor={theme.colors.textFaint}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="off"
+          secureTextEntry
           style={[
             styles.serverInput,
             {
@@ -209,7 +231,7 @@ export default function SettingsScreen() {
             onPress={async () => {
               setBusy('server');
               try {
-                setServerState((await checkServer(serverDraft)) ? 'ok' : 'down');
+                setServerState(await checkServer(serverDraft, tokenDraft.trim() || null));
               } finally {
                 setBusy(null);
               }
@@ -218,13 +240,21 @@ export default function SettingsScreen() {
           <Button
             title={t.settings.save}
             style={{ flex: 1 }}
-            onPress={() => updateSettings({ ocrServerUrl: serverDraft.trim() || null })}
+            onPress={() =>
+              updateSettings({
+                ocrServerUrl: serverDraft.trim() || null,
+                ocrServerToken: tokenDraft.trim() || null,
+              })
+            }
           />
         </Row>
         {serverState === 'ok' ? (
           <Banner tone="success" message={t.settings.serverReachable} />
         ) : null}
-        {serverState === 'down' ? (
+        {serverState === 'unauthorised' ? (
+          <Banner tone="warning" message={t.settings.serverUnauthorised} />
+        ) : null}
+        {serverState === 'unreachable' ? (
           <Banner tone="warning" message={t.settings.serverUnreachable} />
         ) : null}
         {settings.ocrServerUrl ? (

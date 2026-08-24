@@ -65,15 +65,77 @@ powershell -ExecutionPolicy Bypass -File server/start-vlm.ps1
 python server/ocr_server.py
 ```
 
-Then in the app: **Settings → Assisted reading**, enter `<your-ip>:6000`, and
-press *Test connection*. Find the address with `ipconfig`; it needs to be the
-LAN address, not `127.0.0.1`, because the phone is a different machine.
+Then in the app: **Settings → Assisted reading**, enter the address and the
+token, and press *Test connection*.
+
+Print the token with:
+
+```bash
+python server/ocr_server.py --show-token
+```
 
 Check it by hand without the app:
 
 ```bash
-curl -s -X POST --data-binary "@tools/fixtures/106-88-104/IMG_20260824_185304.jpg" -H "Content-Type: image/jpeg" http://127.0.0.1:6000/read
+curl -s -X POST --data-binary "@tools/fixtures/106-88-104/IMG_20260824_185304.jpg" -H "Content-Type: image/jpeg" -H "Authorization: Bearer $(python server/ocr_server.py --show-token)" http://127.0.0.1:6000/read
 ```
+
+### Addresses
+
+On the same network, use the machine's LAN address (`ipconfig`), not
+`127.0.0.1` — the phone is a different machine. Through a tunnel, use the
+hostname.
+
+The app fills in the scheme when you leave it off, and the rule is deliberate: a
+bare IPv4 address, `localhost` or a `.local` name gets `http://`, because a
+private address has no certificate and never will. Anything else gets
+`https://`, because a name that resolves from outside your house must not carry
+a bearer token and a photograph of a medical reading in the clear. Type a scheme
+explicitly if you want to override it.
+
+---
+
+## Access control
+
+Every request must carry `Authorization: Bearer <token>`. A missing token, a
+wrong token and an unknown path all get the same response:
+
+```
+401  {"error": "unauthorised"}
+```
+
+Identical on purpose. Someone probing the hostname cannot use the difference
+between those cases to work out what is running or which routes exist.
+
+The token is 256 bits from the OS entropy source, generated on first run into
+`server/token.txt` and gitignored. It is compared with `hmac.compare_digest`
+rather than `==`: a plain string comparison returns as soon as it finds a
+differing byte, and that timing difference is measurable over a network — enough
+to recover a secret one byte at a time. Set `HH_OCR_TOKEN` to override the file.
+
+To rotate: delete `server/token.txt`, restart, and paste the new value into the
+app.
+
+### Behind a Cloudflare tunnel
+
+The intended deployment. `cloudflared` connects outbound, so nothing is
+port-forwarded and the machine stays off the public internet:
+
+```bash
+cloudflared tunnel --url http://localhost:6000
+```
+
+For a permanent hostname, create a named tunnel and point the ingress rule at
+`http://localhost:6000`, then set the app's address to that hostname.
+
+Two things worth being clear about. The token is now the *only* boundary — on a
+LAN the network itself was one, and through a tunnel there is nothing left but
+the secret, so treat it as a password. And Cloudflare terminates TLS, which
+means the connection is encrypted from the phone to Cloudflare and from
+Cloudflare to `cloudflared`, but Cloudflare is in the middle of it. If that is
+not acceptable, keep it on the LAN. Putting Cloudflare Access in front of the
+hostname adds a second gate, at the cost of the app not being able to
+authenticate through it — the bearer token is what this server understands.
 
 ---
 
@@ -116,10 +178,14 @@ npm run build:apk:assisted
 `preview`, `production` and `production-apk` are unchanged and still come out
 with no network access whatsoever. The trade, stated plainly:
 
-* **Unchanged.** Readings, photos and the database stay on the phone. The
-  server is sent one photo per scan, holds it in memory, and returns three
-  numbers. It writes nothing to disk unless you pass `--debug-dir`, which the
-  app never does.
+* **Unchanged.** Readings, photos, history and backups stay on the phone. The
+  server is sent one photo per scan, holds it in memory for the length of that
+  request, and returns three numbers. It has no database and no upload
+  directory; the only file it ever writes is its own `token.txt`. Even the
+  console line omits the values — `read 960x1280 accepted in 11336ms` — because
+  a log one redirect away from a file is not a place measurements belong.
+  `--debug-dir` is the single exception, it keeps frames, and the app never
+  sets it.
 * **Changed.** The binary is now *capable* of network access. "The photo is only
   sent to the address you typed" is a property of this source code, not
   something the operating system is enforcing on your behalf.

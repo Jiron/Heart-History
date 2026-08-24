@@ -165,6 +165,56 @@ confident wrong number into a dropped field.
 
 ---
 
+## Access control
+
+Every endpoint requires `Authorization: Bearer <token>`. A missing token, a
+wrong token and an unknown path all return the same `401 {"error":
+"unauthorised"}`, so probing tells you nothing about what is running.
+
+Three decisions worth keeping:
+
+- **Generated, never defaulted.** 256 bits from the OS entropy source, written
+  to `server/token.txt` on first run and gitignored. A server with a well-known
+  default password is worse than one with none, because it looks protected.
+- **Compared with `hmac.compare_digest`.** A plain `==` returns at the first
+  differing byte, and that timing is measurable over a network — enough to
+  recover a secret one byte at a time.
+- **The body is drained before rejecting a POST.** Otherwise the client is still
+  uploading megabytes when the socket closes and sees a connection reset instead
+  of the 401 that explains the problem.
+
+This became necessary when the deployment changed. On a LAN, the network was the
+boundary. Behind a Cloudflare tunnel there is no network boundary left, and the
+token is the only thing between a stranger and unmetered use of the GPU.
+
+The app treats a 401 as its own outcome rather than folding it into "server
+down", because they need opposite responses: one is a setting to correct, the
+other is something to wait out.
+
+### The scheme is guessed, deliberately
+
+`192.168.1.20:6000` gets `http://` — a private address has no certificate and
+never will. A named host like `heart.example.dev` gets `https://`, because it
+resolves from anywhere and must not carry a bearer token and a photograph of a
+medical reading in the clear. An explicit scheme always wins.
+
+## Nothing is stored server-side
+
+Worth stating as a property rather than an intention, because it is checkable:
+
+- The photo is decoded into memory, read, and dropped when the request ends.
+  There is no database, no upload directory, no cache.
+- The **only** file the server ever writes is its own `token.txt`.
+- Even the console line omits the values — `read 960x1280 accepted in 11336ms`.
+  A log is one `> server.log` away from being a file, and measurements do not
+  belong in one. The numbers go to the phone that asked and nowhere else.
+- `--debug-dir` is the single exception. It keeps frames, it is off unless
+  asked for, and the app never sets it.
+
+History, photos and backups live on the phone. `exportBackup` writes profiles
+and readings only, so the token is not in a backup either — a backup file shared
+with someone never carries a credential for a machine at home.
+
 ## Refusal rules
 
 The wrapper enforces these regardless of what the model says, because a language
