@@ -74,10 +74,17 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     const saved = (await repo.getSetting('language')) as Settings['language'] | null;
     const dictionary = dictionaryFor(resolveLanguage(saved ?? 'de'));
 
-    const [loadedSettings, loadedProfiles] = await Promise.all([
-      repo.loadSettings(dictionary.profiles.defaultName),
-      repo.listProfiles(),
-    ]);
+    // Sequential, and it has to be.
+    //
+    // These used to run in a `Promise.all`, which is wrong in a way that only
+    // shows on a device that has never run the app: `loadSettings` is what
+    // *creates* the first profile, via `ensureProfile`. Listing profiles
+    // alongside it queues its SELECT before that INSERT lands, so a fresh
+    // install came back with a valid `activeProfileId` and zero profiles.
+    // Everything downstream then had no `profile`, and the app sat on its
+    // splash screen forever. The parallelism saved perhaps a millisecond.
+    const loadedSettings = await repo.loadSettings(dictionary.profiles.defaultName);
+    const loadedProfiles = await repo.listProfiles();
     const active =
       loadedProfiles.find((p) => p.id === loadedSettings.activeProfileId) ??
       loadedProfiles[0];
@@ -263,16 +270,27 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     selectProfile,
   ]);
 
-  const bootstrap = useMemo<Bootstrap>(
-    () => ({
-      // "Loaded but with no state" is a failure, not a ready app: the screens
-      // below assume a profile exists.
-      ready: ready && (value !== null || error !== null),
-      error: error ?? (ready && value === null ? 'Could not load your data.' : null),
+  const bootstrap = useMemo<Bootstrap>(() => {
+    /**
+     * "Loaded but with no state" is a failure, not a ready app: the screens
+     * below assume a profile exists.
+     *
+     * The failure is computed once and used for both fields, which is the
+     * whole point. Previously `ready` tested the raw `error` state while
+     * `error` reported a *derived* message, so a load that succeeded and
+     * produced nothing left `ready` false and the message unreachable --
+     * a permanent spinner behind the splash, describing a problem it could
+     * never show. A guard that cannot report the case it guards against is
+     * worse than no guard, because it looks like one.
+     */
+    const failure =
+      error ?? (ready && value === null ? 'Could not load your data.' : null);
+    return {
+      ready: ready && (value !== null || failure !== null),
+      error: failure,
       retry,
-    }),
-    [ready, value, error, retry],
-  );
+    };
+  }, [ready, value, error, retry]);
 
   return (
     <BootstrapContext.Provider value={bootstrap}>
