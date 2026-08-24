@@ -38,10 +38,12 @@
     --n-gpu-layers 999  Every layer on the GPU. Partial offload keeps the
                       remainder in RAM and computes it on the CPU.
 
-  Note that on the integrated GPU, "VRAM" *is* system memory — the 8060S carves
-  its pool out of the same RAM everything else uses. Roughly 7 GB will be spoken
-  for while the server runs. That is not a leak and not a second copy; it is
-  what an iGPU is. The discrete card is the option that leaves RAM alone.
+  On this machine the iGPU does *not* come out of system RAM: 64 GB is carved off
+  in the BIOS as dedicated VRAM, so a model in it costs the OS nothing. Measured
+  by diffing the dedicated-usage counter across a restart, this model occupies
+  5.55 GB of that carve against a 949 MB process working set. Both numbers
+  depend on the flag above — with mmap the weights land in system RAM *and* get
+  copied into the carve, paid for twice out of the same silicon.
 #>
 
 $ErrorActionPreference = 'Continue'
