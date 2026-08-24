@@ -58,6 +58,9 @@ export function useBootstrap(): Bootstrap {
   return useContext(BootstrapContext);
 }
 
+/** How long startup may take before it is reported as a failure. */
+const BOOTSTRAP_TIMEOUT_MS = 15_000;
+
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,21 +94,49 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     setReady(false);
     setError(null);
     (async () => {
       try {
-        await load();
+        /**
+         * Bounded, because startup must never be able to hang silently.
+         *
+         * `load` opens SQLite and runs any outstanding migrations. If that
+         * settles -- either way -- the screens below take over. If it never
+         * settles, nothing else in the app ever runs: `BootGate` holds the
+         * splash until `ready`, so the app sits on its launch image forever
+         * with no error, no retry and nothing on screen to explain it. That is
+         * the worst failure an app can have, because it looks like a crash and
+         * leaves nothing to report.
+         *
+         * Observed for real: a release build on a *fresh install* stopped here
+         * and never came back. A promise that neither resolves nor rejects has
+         * no stack to inspect, so the fix is to stop waiting on it and say so.
+         * Fifteen seconds is far longer than opening a database and creating
+         * four tables can legitimately take, even on a cold, slow device.
+         */
+        await Promise.race([
+          load(),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error('Timed out while opening the database.')),
+              BOOTSTRAP_TIMEOUT_MS,
+            );
+          }),
+        ]);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Could not open the database.');
         }
       } finally {
+        if (timer) clearTimeout(timer);
         if (!cancelled) setReady(true);
       }
     })();
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
   }, [load, attempt]);
 
