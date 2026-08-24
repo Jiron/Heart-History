@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system';
 import { PermissionsAndroid, Platform } from 'react-native';
 
 import type { OcrResult, OcrWarning } from '@/ocr/types';
@@ -62,17 +63,37 @@ const TIMEOUT_MS = 120_000;
  * Before that, `INTERNET` covered everything. From 16 onwards, reaching an
  * address on the same LAN needs `ACCESS_LOCAL_NETWORK` as well, granted by the
  * user at runtime — and a request without it fails as though the host were
- * simply unreachable, which is a miserable thing to debug. Asking here means the
- * prompt appears when the user presses *Test connection*, next to the field they
- * just typed into, rather than in the middle of a scan.
+ * simply unreachable, which is a miserable thing to debug.
+ *
+ * ## Only for addresses that actually are local
+ *
+ * The `url` argument is the whole point. A hostname reached through a tunnel
+ * needs `INTERNET` and nothing else, and asking for this one anyway was worse
+ * than useless in two ways. Android renders it as *"find, connect to, and
+ * determine the relative position of nearby devices"* — which is an alarming
+ * thing to read when you typed a domain name — and the prompt arrived **in the
+ * middle of a scan**, where it blocked the upload behind a dialog nobody was
+ * expecting. Observed doing exactly that.
+ *
+ * So the question is asked only when the answer could matter: a bare IPv4
+ * address, `localhost`, or a `.local` name.
  *
  * Not declared as a constant in React Native's enum, so the string is used
  * directly; on an older Android the request resolves harmlessly.
  */
 const LOCAL_NETWORK = 'android.permission.ACCESS_LOCAL_NETWORK' as never;
 
-export async function ensureLocalNetworkAccess(): Promise<void> {
+export async function ensureLocalNetworkAccess(url: string): Promise<void> {
   if (Platform.OS !== 'android' || Number(Platform.Version) < 36) return;
+
+  let host: string;
+  try {
+    host = normaliseBase(url).replace(/^https?:\/\//i, '');
+  } catch {
+    return;
+  }
+  if (!looksLocal(host)) return;
+
   try {
     if (await PermissionsAndroid.check(LOCAL_NETWORK)) return;
     await PermissionsAndroid.request(LOCAL_NETWORK);
@@ -150,27 +171,34 @@ function authHeaders(token: string | null): Record<string, string> {
 }
 
 /**
- * Uploads the photo as a multipart file part.
+ * Uploads the photo as raw JPEG bytes.
  *
- * Not base64 JSON, which is what this used to be and what worked fine on a LAN.
- * Through a Cloudflare tunnel it does not, and the difference is stark —
- * measured against the same server and the same photograph:
+ * ## Not multipart, and not base64 JSON
  *
- *     Content-Type: image/jpeg              -> 200
- *     {"image": "<440 KB of base64>"}       -> 403 Forbidden
+ * Both were tried against the real deployment, and each failed at a different
+ * layer:
  *
- * The 403 comes from Cloudflare's managed rules, which treat a large base64 blob
- * inside a JSON field as an attack payload. No header talks them out of it.
+ *   {"image": "<440 KB of base64>"}   403 from Cloudflare. A large base64 blob
+ *                                     in a JSON field matches their managed
+ *                                     rules for an attack payload.
  *
- * A multipart file part is the ordinary shape for sending a photograph, so it
- * passes, and it is better in two other ways: a third smaller, since base64
- * inflates by 4/3, and React Native streams a `{ uri }` part through its native
- * networking layer rather than materialising a half-megabyte string in
- * JavaScript first.
+ *   FormData with { uri, name, type }  "Unsupported FormDataPart implementation".
+ *                                     Expo SDK 54+ replaces the global `fetch`
+ *                                     with its WinterCG implementation, and that
+ *                                     one accepts only a string, a Blob, or an
+ *                                     object with `bytes()`. React Native's own
+ *                                     object-with-a-uri form part -- the shape
+ *                                     every RN upload tutorial uses -- is not
+ *                                     one of them. See
+ *                                     expo/src/winter/fetch/convertFormData.ts.
  *
- * `Content-Type` is deliberately not set here. React Native fills it in with the
- * generated multipart boundary; setting it by hand produces a header whose
- * boundary does not match the body, and the server cannot parse it.
+ * Raw bytes sidestep both. Cloudflare treats `image/jpeg` as what it is (200,
+ * measured), Expo's fetch takes a `Uint8Array` body directly, and the server has
+ * accepted raw bodies all along -- it is what `curl --data-binary` sends. It is
+ * also the smallest of the three: no base64 inflation, no multipart framing.
+ *
+ * The file is read through expo-file-system rather than carried as a JavaScript
+ * string, so a half-megabyte photo never becomes a half-megabyte of UTF-16.
  */
 async function postPhoto(
   url: string,
@@ -178,12 +206,7 @@ async function postPhoto(
   token: string | null,
   timeoutMs: number,
 ): Promise<Response> {
-  const form = new FormData();
-  form.append('photo', {
-    uri: fileUri,
-    name: 'photo.jpg',
-    type: 'image/jpeg',
-  } as unknown as Blob);
+  const bytes = new Uint8Array(await new File(fileUri).arrayBuffer());
 
   // RN's fetch has no timeout of its own; without this a server that accepts the
   // connection and then stalls leaves the review screen spinning forever.
@@ -192,8 +215,8 @@ async function postPhoto(
   try {
     return await fetch(url, {
       method: 'POST',
-      headers: authHeaders(token),
-      body: form,
+      headers: { 'Content-Type': 'image/jpeg', ...authHeaders(token) },
+      body: bytes,
       signal: controller.signal,
     });
   } finally {
@@ -213,7 +236,7 @@ export type ServerCheck = 'ok' | 'unauthorised' | 'unreachable' | 'noPermission'
 
 export async function checkServer(url: string, token: string | null): Promise<ServerCheck> {
   if (!(await hasNetworkPermission())) return 'noPermission';
-  await ensureLocalNetworkAccess();
+  await ensureLocalNetworkAccess(url);
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 10_000);
@@ -266,7 +289,7 @@ export async function readRemotely(
   // Refuse rather than crash on a build that has no INTERNET permission. See
   // hasNetworkPermission -- there is no catch that helps once the call is made.
   if (!(await hasNetworkPermission())) throw new RemoteOcrError('noNetworkPermission');
-  await ensureLocalNetworkAccess();
+  await ensureLocalNetworkAccess(serverUrl);
   let response: Response;
   try {
     response = await postPhoto(
