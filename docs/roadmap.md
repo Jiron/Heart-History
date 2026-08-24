@@ -72,10 +72,21 @@ need it — would make that a promise rather than a hope.
 
 ## Deliberately not planned
 
-**A cloud account, sync, or a server of any kind.** The app's guarantee is that
-readings cannot leave the device, and that is enforced by stripping the network
-permission from the manifest. Sync would trade that for convenience. Backup files
-already cover moving to a new phone, and they move under the user's control.
+**A cloud account, or sync.** The app's guarantee is that readings cannot leave
+the device, and that is enforced by stripping the network permission from the
+manifest. Sync would trade that for convenience. Backup files already cover
+moving to a new phone, and they move under the user's control.
+
+This is not contradicted by [assisted reading](./assisted-reading.md), and the
+distinction is the point: that sends one photo to a machine the user owns, from
+a build they chose, and nothing is stored or accounted anywhere. A hosted service
+holding a history would be a different thing, and is still not planned.
+
+**Panel detection and perspective correction** is the opposite: very much worth
+building, just not built. It is the only route to reading a hand-held photo
+offline, and it would make the existing segment reader good rather than replace
+it. See [assisted-reading.md](./assisted-reading.md) for why the fallback exists
+in the meantime.
 
 **Diagnosis, risk scores, or advice.** Heart History records measurements and
 describes them against published categories. Anything that reads as a medical

@@ -335,6 +335,38 @@ row-height model, severing the panel border, per-row merging, confidence-weighte
 pass ranking — came from one of these four photos. None was visible in the
 synthetic set, which is the point of having them.
 
+### Where this approach runs out
+
+The four photographs above were taken to test the recogniser: the monitor fills
+the frame and the camera is roughly square-on. Twenty-three later ones were not.
+They are in `tools/fixtures/106-88-104/` and `tools/fixtures/107-78-98/`, taken
+the way a person actually takes them - monitor small in frame, held at an angle,
+lit by a phone torch, sometimes slightly soft. Run them with `npm run ocr:folders`.
+
+```
+runs 92   accepted 4   correct 4   WRONG 0
+```
+
+**One photograph out of twenty-three**, with all four accepts coming from the
+same image. Still nothing wrong, which is the invariant holding under pressure.
+But as a reader, on the input that matters, it does not work.
+
+This is not a tuning failure and no combination of the knobs listed below fixes
+it. Steps 2 through 6 of the pipeline all assume the panel is most of the picture
+and roughly square-on. At a tenth of the frame the threshold window spans several
+digits so strokes stop separating from the background; at twenty degrees the
+bottom of the systolic row overlaps the top of the diastolic row in y and they
+merge into one band. The multi-pass ladder varies parameters *downstream* of a
+step that has already failed.
+
+Fixing it means finding the LCD quadrilateral and warping it to a rectangle
+before any of this runs - at which point everything above becomes useful again,
+because it is good at reading a panel it can find. That work is not done. What
+exists instead is an optional [assisted reader](./assisted-reading.md): a vision
+model on your own machine, which needs none of the localisation and reads these
+photographs. It is off by default and requires a build with network permission,
+so the on-device path described on this page remains what ships.
+
 ### Why both
 
 Synthetic fixtures give ground truth. Measuring accuracy needs to know the right
@@ -353,9 +385,13 @@ A panel border dark enough to bridge into the digits. A pulse row two thirds the
 height of the pressure rows. Those were not oversights in the renderer so much as
 things nobody would think to draw.
 
-**Adding your own photos.** Drop them in `tools/fixtures/`, add an entry to
-`expected.json` with the values a human reads off the display, and run
-`npm run ocr:real`. The test suite picks them up automatically too. Use
+**Adding your own photos.** Two ways. For a one-off, drop it in
+`tools/fixtures/` and add an entry to `expected.json`. For a batch that all show
+the same reading - which is the useful shape, since it takes a dozen angles of
+one display to find a bias - make a folder named `sys-dia-pul`, for example
+`tools/fixtures/106-88-104/`, and drop them in. No manifest entry needed: the
+name is the ground truth. Then run `npm run ocr:real` or `npm run ocr:folders`;
+the test suite picks them up automatically either way. Use
 `npm run ocr:real -- --write-debug` for annotated PNGs of the ink mask, detected
 bands and probed cells, and `npx tsx tools/crop.ts <file> <x> <y> <w> <h> <zoom>`
 to magnify a region. Looking at those overlays is how nearly every bug described

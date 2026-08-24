@@ -200,6 +200,9 @@ export const en: Dictionary = {
     privacyTitle: 'Everything stays on this phone',
     privacyMessage:
       'Photos are read on the device itself. Heart History has no server, and the released app is built without network access at all — so your readings cannot leave this phone unless you export them yourself.',
+    privacyAssistedTitle: 'Photos go to your own server',
+    privacyAssistedMessage: (url: string) =>
+      `Assisted reading is on: every scanned photo is sent to ${url} and read there. It is not stored and it does not leave your network. All readings and photos stay on this phone. Clear the field under "Assisted reading" to go back to reading only on the device.`,
     medicalDisclaimer:
       'Heart History records measurements. It is not a medical device and does not diagnose anything — please discuss what your readings mean with a doctor.',
     exportedCount: (n: number) =>
@@ -231,6 +234,8 @@ export const en: Dictionary = {
     permissionTitle: 'Camera access is needed to read your monitor',
     permissionMessage:
       'Photos are analysed on this phone and never uploaded anywhere. You can also pick an existing photo instead.',
+    permissionMessageAssisted:
+      'Photos are sent to your own reading server and analysed there — they do not leave your network. You can also pick an existing photo instead.',
     allowCamera: 'Allow camera',
     choosePhoto: 'Choose a photo',
     goBack: 'Go back',

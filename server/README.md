@@ -143,6 +143,21 @@ them differently:** a refusal costs a manual entry, while a wrong reading puts a
 number nobody measured into a medical history where nothing later questions it.
 The script exits non-zero only on the second.
 
+Current, on an RTX 3060:
+
+```
+photos graded          27
+produced a reading     23  (85%)
+fully correct          24  (89%)
+blood pressure WRONG   0      <- must stay 0
+pulse wrong            0
+mean time              11155 ms
+```
+
+Each photo is read four ways and the answers must agree, so about eleven seconds
+covers four inferences. `--passes 1` skips the agreement check, which is useful
+for measuring the model alone and is not safe to run against.
+
 ---
 
 ## The API

@@ -339,8 +339,14 @@ export default function SettingsScreen() {
         <View style={{ marginTop: 14 }}>
           <Banner
             tone="info"
-            title={t.settings.privacyTitle}
-            message={t.settings.privacyMessage}
+            title={
+              settings.ocrServerUrl ? t.settings.privacyAssistedTitle : t.settings.privacyTitle
+            }
+            message={
+              settings.ocrServerUrl
+                ? t.settings.privacyAssistedMessage(settings.ocrServerUrl)
+                : t.settings.privacyMessage
+            }
           />
         </View>
         <Text style={[styles.hint, { color: theme.colors.textFaint }]}>

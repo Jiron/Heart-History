@@ -115,14 +115,32 @@ def encode(image: Image.Image) -> str:
     return base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
-# Three renderings of the same photo, used to catch a segment the camera did not
+# Four renderings of the same photo, used to catch a segment the camera did not
 # resolve. They are not attempts to improve the image -- the point is that a bar
-# which is genuinely lit survives all three, while one that only looked lit
-# because of where a shadow fell does not. See `consensus`.
+# which is genuinely lit reads the same in all four, while one that only looked
+# a certain way because of where a shadow or a highlight fell does not. See
+# `consensus`.
+#
+# They are ordered cheapest-first and chosen to fail *differently*, which is the
+# only property that matters here. Two renderings that distort an image the same
+# way agree with each other and prove nothing:
+#
+#   plain      the photo as taken
+#   contrast   endpoints stretched; moves a shadow boundary without touching
+#              relative brightness within the panel
+#   sharp      small-radius unsharp mask; recovers a thin bar lost to softness
+#   equalize   histogram flattened, which redistributes tone completely. This is
+#              the one that disagrees under heavy glare -- measured on
+#              IMG_20260824_185308, where the first three all read the washed-out
+#              pulse row as 74 and this one read 88. Neither is right; the
+#              display said 104 and the row is not recoverable. Disagreeing is
+#              the correct outcome, and without this rendering that photo
+#              returned a confident wrong pulse.
 RENDERINGS = (
     ("plain", lambda im: im),
     ("contrast", lambda im: ImageOps.autocontrast(im, cutoff=1)),
     ("sharp", lambda im: im.filter(ImageFilter.UnsharpMask(radius=2, percent=140, threshold=3))),
+    ("equalize", lambda im: ImageOps.equalize(im)),
 )
 
 
@@ -353,13 +371,22 @@ class Handler(BaseHTTPRequestHandler):
         result = validate(agree(answers))
         result["elapsedMs"] = int((time.time() - started) * 1000)
         result["source"] = "vlm"
+        result["renderings"] = [
+            {
+                "as": label,
+                "sys": answer.get("systolic"),
+                "dia": answer.get("diastolic"),
+                "pul": answer.get("pulse"),
+            }
+            for (label, _), answer in zip(renderings, answers)
+        ]
         self._send(200, result)
 
         sys.stderr.write(
             "read %dx%d -> %s/%s/%s ok=%s in %dms\n"
             % (
-                width,
-                height,
+                image.width,
+                image.height,
                 result["systolic"],
                 result["diastolic"],
                 result["pulse"],

@@ -51,7 +51,14 @@ const config: ExpoConfig = {
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
-    permissions: ['android.permission.CAMERA', 'android.permission.VIBRATE'],
+    permissions: [
+      'android.permission.CAMERA',
+      'android.permission.VIBRATE',
+      // Android 16 split local-network access out of INTERNET. Without it a
+      // request to a machine on the same LAN fails as though the host were
+      // down. Only declared for the builds that have INTERNET at all.
+      ...(allowsNetwork ? ['android.permission.ACCESS_LOCAL_NETWORK'] : []),
+    ],
     blockedPermissions: [
       // See the note above: released builds have no network access at all.
       ...(allowsNetwork ? [] : ['android.permission.INTERNET']),

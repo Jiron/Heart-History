@@ -1,3 +1,5 @@
+import { PermissionsAndroid, Platform } from 'react-native';
+
 import type { OcrResult, OcrWarning } from '@/ocr/types';
 
 /**
@@ -45,6 +47,32 @@ export class RemoteOcrError extends Error {}
 /** Long enough for a cold model to load, short enough not to hang the review screen. */
 const TIMEOUT_MS = 45_000;
 
+/**
+ * Android 16 put local network access behind its own runtime permission.
+ *
+ * Before that, `INTERNET` covered everything. From 16 onwards, reaching an
+ * address on the same LAN needs `ACCESS_LOCAL_NETWORK` as well, granted by the
+ * user at runtime — and a request without it fails as though the host were
+ * simply unreachable, which is a miserable thing to debug. Asking here means the
+ * prompt appears when the user presses *Test connection*, next to the field they
+ * just typed into, rather than in the middle of a scan.
+ *
+ * Not declared as a constant in React Native's enum, so the string is used
+ * directly; on an older Android the request resolves harmlessly.
+ */
+const LOCAL_NETWORK = 'android.permission.ACCESS_LOCAL_NETWORK' as never;
+
+export async function ensureLocalNetworkAccess(): Promise<void> {
+  if (Platform.OS !== 'android' || Number(Platform.Version) < 36) return;
+  try {
+    if (await PermissionsAndroid.check(LOCAL_NETWORK)) return;
+    await PermissionsAndroid.request(LOCAL_NETWORK);
+  } catch {
+    // Older platforms reject an unknown permission string. Nothing to do: on
+    // those, INTERNET alone is sufficient and the request was never needed.
+  }
+}
+
 function normaliseBase(url: string): string {
   const trimmed = url.trim().replace(/\/+$/, '');
   if (!trimmed) throw new RemoteOcrError('empty URL');
@@ -70,6 +98,7 @@ async function postJson(url: string, body: unknown, timeoutMs: number): Promise<
 
 /** True when the server is up and its model is loaded. Used by the settings screen. */
 export async function checkServer(url: string): Promise<boolean> {
+  await ensureLocalNetworkAccess();
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
@@ -113,6 +142,7 @@ function warningsFrom(reading: RemoteReading): OcrWarning[] {
  */
 export async function readRemotely(base64Jpeg: string, serverUrl: string): Promise<OcrResult> {
   const started = Date.now();
+  await ensureLocalNetworkAccess();
   let response: Response;
   try {
     response = await postJson(

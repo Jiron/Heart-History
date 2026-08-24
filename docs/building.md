@@ -82,12 +82,26 @@ npm run ocr:bench                       # accuracy across every synthetic condit
 npm run ocr:bench -- --preset dim --verbose --seeds 3
 npm run ocr:real                        # accuracy against the real photos
 npm run ocr:real -- --write-debug       # annotated masks to tools/out/real/
+npm run ocr:folders                     # accuracy against the foldered photo sets
 npm run ocr:debug                       # one display, annotated PNGs to tools/out/
 npm run ocr:debug -- --sys 148 --dia 93 --pul 101 --preset hard
 ```
 
 `ocr:real` is the one that decides whether a change was an improvement. See
 [ocr.md](ocr.md) for what the two benchmarks measure and why both are needed.
+
+`ocr:folders` reads every folder under `tools/fixtures/` named `sys-dia-pul`.
+Adding photographs needs no manifest: the folder name is the ground truth. It is
+also the benchmark the on-device recogniser currently fails — see
+[assisted-reading.md](assisted-reading.md) — so treat a change there as
+significant.
+
+To measure the assisted reader instead, start both halves (see
+[server/README.md](../server/README.md)) and run:
+
+```bash
+python tools/vlm-grade.py
+```
 
 `ocr:debug` writes `photo.png`, `gray.png` and `mask.png`. The mask overlay draws
 detected bands in red and probed glyph cells in blue — looking at that image is
@@ -139,6 +153,7 @@ credentials safe.
 | `npm run build:aab` | `production` | AAB | uploading to Google Play |
 | `npm run build:dev` | `development` | APK | a dev client (needs Metro) |
 | `npm run build:apk:local` | `preview`, local | APK | building on this machine |
+| `npm run build:apk:assisted` | `assisted-apk` | APK | using a self-hosted reading server |
 
 The cloud build needs nothing installed locally. `build:apk:local` builds on this
 machine instead, which means it needs the Android SDK and a **JDK 17** — see the
@@ -154,8 +169,16 @@ increments it per production build. The user-facing `version` lives in
 ### The network permission
 
 `app.config.ts` strips `android.permission.INTERNET` from every build **except**
-`development`, which needs it to reach Metro. So `preview`, `production` and
-`production-apk` produce an app that physically cannot make a network request.
+two: `development`, which needs it to reach Metro, and `assisted-apk`, which
+needs it to reach a reading server you run yourself. So `preview`, `production`
+and `production-apk` produce an app that physically cannot make a network
+request.
+
+`assisted-apk` also turns on `usesCleartextTraffic`, via `expo-build-properties`.
+A server on your own network has no certificate a phone would trust, and Android
+blocks plain HTTP by default — without it every request fails with an error that
+does not say why. Both are driven by the same `HH_ALLOW_NETWORK` variable, set in
+`eas.json` for that one profile, so they cannot drift apart.
 
 You can confirm it on a built APK:
 
@@ -163,8 +186,8 @@ You can confirm it on a built APK:
 aapt dump permissions app-release.apk
 ```
 
-`android.permission.INTERNET` should not appear. To check the config before
-building:
+`android.permission.INTERNET` should not appear for any profile but those two.
+To check the config before building:
 
 ```bash
 npx expo config --type introspect
@@ -173,9 +196,12 @@ npx expo config --type introspect
 The permission appears with `tools:node: 'remove'`, which is the manifest-merger
 directive that deletes it from the final APK.
 
-If you ever add something that genuinely needs the network, remove the entry from
-`blockedPermissions` — and update the claims in the README, `docs/requirements.md`
-and the Settings screen, all three of which currently promise otherwise.
+If you ever add something that genuinely needs the network in a *shipping* build,
+remove the entry from `blockedPermissions` — and update the claims in the README,
+`docs/requirements.md` and the Settings screen, all three of which currently
+promise otherwise. Assisted reading deliberately did not do that: it took a
+separate profile instead, so that the default build keeps a guarantee the
+operating system enforces rather than one this codebase merely intends.
 
 ## Native project files
 
