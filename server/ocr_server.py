@@ -51,6 +51,7 @@ import json
 import os
 import secrets
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -107,6 +108,26 @@ TOKEN = load_or_create_token()
 # and cost decode time.
 MAX_DIM = 1280
 JPEG_QUALITY = 90
+
+# Largest upload accepted. A phone photo resized to 1280 is a few hundred
+# kilobytes; this is generous even for someone posting an untouched original.
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+
+# Refuse rather than warn above this. Pillow's own ceiling is ~89 megapixels and
+# below that it only raises a warning, which is no use in a service: a few
+# kilobytes of crafted PNG can declare a canvas that costs gigabytes to decode.
+# 40 MP is above any phone camera and well below anything dangerous.
+Image.MAX_IMAGE_PIXELS = 40_000_000
+
+# How many uploads may be in flight at once.
+#
+# Not for throughput -- llama-server runs with --parallel 1, so reads serialise
+# anyway. This bounds *memory*. Each request in flight holds the upload, the
+# decoded bitmap and four renderings of it, and ThreadingHTTPServer will happily
+# start a thread per connection. Without a cap, enough simultaneous uploads
+# exhaust RAM; with one, the surplus gets an immediate 503 and costs nothing.
+MAX_IN_FLIGHT = 4
+_in_flight = threading.BoundedSemaphore(MAX_IN_FLIGHT)
 
 # Ranges a real measurement falls in. A monitor that reads outside these is
 # broken; a model that reports outside these has hallucinated.
@@ -201,12 +222,79 @@ def extract_image(body: bytes, content_type: str) -> bytes:
     return body
 
 
+# Formats this server will decode. Everything else is rejected before Pillow
+# is handed the bytes -- see `decode`.
+ALLOWED_FORMATS = ("JPEG", "PNG", "WEBP", "MPO", "AVIF")
+
+# First bytes of each. Checked before any decoder runs, so a file pretending to
+# be a photograph is turned away by twenty lines of Python rather than by a C
+# image parser.
+MAGIC = (
+    b"\xff\xd8\xff",                      # JPEG (and MPO, which is JPEG-framed)
+    b"\x89PNG\r\n\x1a\n",                 # PNG
+    b"RIFF",                              # WebP (checked further below)
+    b"\x00\x00\x00",                      # ISO-BMFF box length, for AVIF/HEIF
+)
+
+
+def looks_like_image(raw: bytes) -> bool:
+    if raw.startswith(b"\xff\xd8\xff") or raw.startswith(b"\x89PNG\r\n\x1a\n"):
+        return True
+    if raw.startswith(b"RIFF") and raw[8:12] == b"WEBP":
+        return True
+    # ISO base media: a box length, then 'ftyp'. Covers AVIF and HEIF.
+    if len(raw) > 12 and raw[4:8] == b"ftyp":
+        return True
+    return False
+
+
 def decode(raw: bytes) -> Image.Image:
-    image = Image.open(io.BytesIO(raw))
-    # Phones record orientation in EXIF rather than rotating the pixels. Without
-    # this a portrait photo arrives on its side and the rows stop being rows.
-    image = ImageOps.exif_transpose(image)
-    image = image.convert("RGB")
+    """
+    Turns uploaded bytes into an image, or refuses.
+
+    ## Why this is fussier than `Image.open(BytesIO(raw))`
+
+    That one line will decode **43 different formats**, because Pillow registers
+    every plugin it can. This server exists to read photographs of an LCD; a
+    phone sends JPEG. Accepting BLP, DDS, FLI, FITS, PCD, PSD, GRIB and the rest
+    means exposing forty-odd C decoders -- most of which have carried memory-
+    safety CVEs at some point -- to bytes from anyone who can reach the port.
+
+    One of them is worse than the others. Pillow's EPS plugin **shells out to
+    Ghostscript** to rasterise. Ghostscript is not installed here today, so that
+    path is inert; it is also one `choco install ghostscript` away from being a
+    remote code execution bug in a service that is reachable from the internet.
+    That is not a risk worth carrying for a format nobody will ever upload.
+
+    So: a magic-byte check first, so nothing reaches a decoder without looking
+    like a photograph, and then `formats=` so Pillow only *tries* the five
+    plugins that could plausibly be right. Both are cheap. Together they take
+    the decoder attack surface from 43 formats to 5.
+
+    The pixel ceiling is the other half. A few kilobytes of PNG can declare a
+    50000x50000 canvas that costs gigabytes to decode -- a decompression bomb.
+    Pillow's own limit is ~89 megapixels and only warns below it; this is well
+    under any real phone camera and raises rather than warns.
+    """
+    if not looks_like_image(raw):
+        raise ValueError("that does not look like a photograph")
+
+    try:
+        image = Image.open(io.BytesIO(raw), formats=ALLOWED_FORMATS)
+        # Phones record orientation in EXIF rather than rotating the pixels.
+        # Without this a portrait photo arrives on its side and the rows stop
+        # being rows.
+        image = ImageOps.exif_transpose(image)
+        image = image.convert("RGB")
+    except Image.DecompressionBombError:
+        raise ValueError("that image is too large to decode")
+    except ValueError:
+        raise
+    except Exception:
+        # Deliberately not echoed to the caller. A decoder's own error text
+        # names internals and file paths, and tells someone probing the service
+        # which parser they reached.
+        raise ValueError("that file could not be read as a photograph")
 
     longest = max(image.size)
     if longest > MAX_DIM:
@@ -409,7 +497,19 @@ def validate(raw: dict) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+    # Deliberately not the Python default, which announces the interpreter
+    # version alongside the server name. There is no reason to tell a stranger
+    # which Python this is.
     server_version = "HeartHistoryOCR/1.0"
+    sys_version = ""
+
+    # Drops a connection that goes quiet mid-request. Without it, opening
+    # sockets and dribbling bytes ties up a thread each, indefinitely, for
+    # almost no effort -- the slowloris shape. This bounds only socket
+    # operations, not the seventeen seconds we spend reading the display, since
+    # nothing touches the socket during that.
+    timeout = 30
+
     debug_dir = None
     passes = len(RENDERINGS)
 
@@ -475,11 +575,29 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "not found"})
             return
 
-        length = int(self.headers.get("Content-Length", "0"))
-        if length <= 0 or length > 25 * 1024 * 1024:
-            self._send(400, {"error": "expected an image body under 25 MB"})
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        if length <= 0:
+            self._send(400, {"error": "expected an image body"})
+            return
+        if length > MAX_UPLOAD_BYTES:
+            # Answered and closed without reading it. The client will usually
+            # see the connection drop mid-upload rather than this response,
+            # which is the right trade: reading 26 MB in order to be polite
+            # about refusing 26 MB is the thing being defended against.
+            self._send(413, {"error": "image too large"})
             return
 
+        # Turn away the surplus before reading a single byte of it, so a flood
+        # costs a socket and a 503 rather than however much memory it asked for.
+        if not _in_flight.acquire(blocking=False):
+            self._send(503, {"error": "busy, try again in a moment"})
+            return
+        try:
+            self._read_and_answer(length)
+        finally:
+            _in_flight.release()
+
+    def _read_and_answer(self, length: int) -> None:
         raw = self.rfile.read(length)
         content_type = self.headers.get("Content-Type", "")
         try:
@@ -492,7 +610,11 @@ class Handler(BaseHTTPRequestHandler):
         try:
             image = decode(raw)
         except Exception as error:
-            self._send(400, {"error": "could not decode the image: %s" % error})
+            # `decode` raises ValueError with wording chosen to be safe to
+            # show. Anything else is a bug here, and its text would describe
+            # internals, so it does not travel.
+            safe = str(error) if isinstance(error, ValueError) else "could not read that image"
+            self._send(400, {"error": safe})
             return
 
         renderings = RENDERINGS[: max(1, self.passes)]

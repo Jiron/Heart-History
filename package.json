@@ -26,7 +26,8 @@
     "ocr:server": "powershell -ExecutionPolicy Bypass -File server/ocr.ps1 status",
     "ocr:server:start": "powershell -ExecutionPolicy Bypass -File server/ocr.ps1 start",
     "ocr:server:stop": "powershell -ExecutionPolicy Bypass -File server/ocr.ps1 stop",
-    "ocr:server:restart": "powershell -ExecutionPolicy Bypass -File server/ocr.ps1 restart"
+    "ocr:server:restart": "powershell -ExecutionPolicy Bypass -File server/ocr.ps1 restart",
+    "ocr:server:attack": "python server/attack_test.py"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
