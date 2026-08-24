@@ -77,6 +77,15 @@ export interface Settings {
    * what that trades away.
    */
   ocrServerUrl: string | null;
+  /**
+   * Bearer token for the assisted reader. Required by the server; a wrong or
+   * missing one is refused the same way an unknown caller is.
+   *
+   * Kept out of exported backups by construction: `exportBackup` writes only
+   * profiles and readings, so a backup file shared with someone never carries
+   * a credential for a machine at home.
+   */
+  ocrServerToken: string | null;
 }
 
 export type ClassificationScale = 'esh' | 'home';

@@ -347,6 +347,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'activeProfileId'> = {
   // Off unless the user sets it: the app reads on the device by default, and
   // released builds have no network permission to reach a server with anyway.
   ocrServerUrl: null,
+  ocrServerToken: null,
 };
 
 export async function loadSettings(defaultProfileName = 'Me'): Promise<Settings> {
@@ -364,5 +365,6 @@ export async function loadSettings(defaultProfileName = 'Me'): Promise<Settings>
     keepPhotos: map.get('keepPhotos') !== 'false',
     alwaysConfirmScans: map.get('alwaysConfirmScans') === 'true',
     ocrServerUrl: map.get('ocrServerUrl') || null,
+    ocrServerToken: map.get('ocrServerToken') || null,
   };
 }

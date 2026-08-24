@@ -218,7 +218,16 @@ export default function ReviewScreen() {
       keyboardShouldPersistTaps="handled"
     >
       {outcome.assistedError ? (
-        <Banner tone="warning" message={t.review.assistedFellBack} />
+        <Banner
+          tone="warning"
+          message={
+            // A rejected token is a setting to correct, not an outage to wait
+            // out, and the two look identical from the review screen otherwise.
+            outcome.assistedError === 'unauthorised'
+              ? t.review.assistedUnauthorised
+              : t.review.assistedFellBack
+          }
+        />
       ) : null}
 
       {result.ok ? (

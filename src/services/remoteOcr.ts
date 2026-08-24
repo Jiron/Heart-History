@@ -82,13 +82,46 @@ export async function ensureLocalNetworkAccess(): Promise<void> {
   }
 }
 
+/** A bare IPv4 address, `localhost`, or an mDNS `.local` name — i.e. this network. */
+function looksLocal(host: string): boolean {
+  const bare = host.split(':')[0].toLowerCase();
+  return (
+    bare === 'localhost' ||
+    bare.endsWith('.local') ||
+    /^\d{1,3}(\.\d{1,3}){3}$/.test(bare)
+  );
+}
+
+/**
+ * Turns what the user typed into a URL, guessing the scheme when they omit it.
+ *
+ * The guess matters. `192.168.1.20:6000` has to be plain HTTP — there is no
+ * certificate for a private address and never will be. A hostname like
+ * `heart.example.dev` is the opposite: it is reachable from anywhere, so
+ * sending a bearer token and a photograph of a medical reading over HTTP would
+ * hand both to anyone on the path. Defaulting a named host to HTTPS means the
+ * safe case is what you get for typing the obvious thing.
+ *
+ * An explicit scheme always wins, so `http://my-host` remains possible for
+ * anyone who genuinely wants it.
+ */
 function normaliseBase(url: string): string {
   const trimmed = url.trim().replace(/\/+$/, '');
   if (!trimmed) throw new RemoteOcrError('empty URL');
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `${looksLocal(trimmed) ? 'http' : 'https'}://${trimmed}`;
 }
 
-async function postJson(url: string, body: unknown, timeoutMs: number): Promise<Response> {
+function authHeaders(token: string | null): Record<string, string> {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function postJson(
+  url: string,
+  body: unknown,
+  token: string | null,
+  timeoutMs: number,
+): Promise<Response> {
   // RN's fetch has no timeout of its own; without this a server that accepts the
   // connection and then stalls leaves the review screen spinning forever.
   const controller = new AbortController();
@@ -96,7 +129,7 @@ async function postJson(url: string, body: unknown, timeoutMs: number): Promise<
   try {
     return await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -105,24 +138,35 @@ async function postJson(url: string, body: unknown, timeoutMs: number): Promise<
   }
 }
 
-/** True when the server is up and its model is loaded. Used by the settings screen. */
-export async function checkServer(url: string): Promise<boolean> {
+/**
+ * What a connection test found.
+ *
+ * Three outcomes rather than a boolean, because "wrong token" and "nothing
+ * answered" need completely different things done about them, and the server
+ * deliberately will not tell them apart for anyone who is not holding the
+ * token. Since we might be, we can.
+ */
+export type ServerCheck = 'ok' | 'unauthorised' | 'unreachable';
+
+export async function checkServer(url: string, token: string | null): Promise<ServerCheck> {
   await ensureLocalNetworkAccess();
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    const timer = setTimeout(() => controller.abort(), 10_000);
     try {
       const response = await fetch(`${normaliseBase(url)}/health`, {
+        headers: authHeaders(token),
         signal: controller.signal,
       });
-      if (!response.ok) return false;
+      if (response.status === 401) return 'unauthorised';
+      if (!response.ok) return 'unreachable';
       const body = (await response.json()) as { ok?: boolean };
-      return body.ok === true;
+      return body.ok === true ? 'ok' : 'unreachable';
     } finally {
       clearTimeout(timer);
     }
   } catch {
-    return false;
+    return 'unreachable';
   }
 }
 
@@ -149,7 +193,11 @@ function warningsFrom(reading: RemoteReading): OcrWarning[] {
  * pass/fail. Inventing a gradient here would put a number on the screen that
  * nothing measured.
  */
-export async function readRemotely(base64Jpeg: string, serverUrl: string): Promise<OcrResult> {
+export async function readRemotely(
+  base64Jpeg: string,
+  serverUrl: string,
+  token: string | null,
+): Promise<OcrResult> {
   const started = Date.now();
   await ensureLocalNetworkAccess();
   let response: Response;
@@ -157,11 +205,18 @@ export async function readRemotely(base64Jpeg: string, serverUrl: string): Promi
     response = await postJson(
       `${normaliseBase(serverUrl)}/read`,
       { image: base64Jpeg },
+      token,
       TIMEOUT_MS,
     );
   } catch (error) {
     const aborted = error instanceof Error && error.name === 'AbortError';
     throw new RemoteOcrError(aborted ? 'timeout' : 'unreachable');
+  }
+
+  if (response.status === 401) {
+    // Named, because it is the one failure the user can fix in ten seconds and
+    // the one they will otherwise misread as the server being down.
+    throw new RemoteOcrError('unauthorised');
   }
 
   if (!response.ok) {

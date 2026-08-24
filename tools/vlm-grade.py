@@ -30,8 +30,24 @@ import sys
 import time
 import urllib.request
 
-FIXTURE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", "fixtures")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FIXTURE_DIR = os.path.join(ROOT, "tools", "fixtures")
 SERVER = os.environ.get("HH_OCR_URL", "http://127.0.0.1:6000/read")
+
+
+def token() -> str:
+    """The same token the server generated, read from where it wrote it."""
+    from_env = os.environ.get("HH_OCR_TOKEN", "").strip()
+    if from_env:
+        return from_env
+    path = os.path.join(ROOT, "server", "token.txt")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as handle:
+            return handle.read().strip()
+    return ""
+
+
+TOKEN = token()
 
 
 def read_photo(path: str, timeout: float = 300.0) -> dict:
@@ -40,7 +56,11 @@ def read_photo(path: str, timeout: float = 300.0) -> dict:
     request = urllib.request.Request(
         SERVER,
         data=body,
-        headers={"Content-Type": "image/jpeg", "Content-Length": str(len(body))},
+        headers={
+            "Content-Type": "image/jpeg",
+            "Content-Length": str(len(body)),
+            "Authorization": "Bearer " + TOKEN,
+        },
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=timeout) as response:
