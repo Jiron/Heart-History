@@ -257,6 +257,9 @@ export default function SettingsScreen() {
         {serverState === 'unreachable' ? (
           <Banner tone="warning" message={t.settings.serverUnreachable} />
         ) : null}
+        {serverState === 'noPermission' ? (
+          <Banner tone="danger" message={t.settings.serverNoPermission} />
+        ) : null}
         {settings.ocrServerUrl ? (
           <Text style={{ ...theme.typography.caption, color: theme.colors.textFaint }}>
             {t.settings.assistedReadingOn(settings.ocrServerUrl)}

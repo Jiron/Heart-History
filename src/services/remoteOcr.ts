@@ -82,6 +82,39 @@ export async function ensureLocalNetworkAccess(): Promise<void> {
   }
 }
 
+/**
+ * Whether this build is allowed to open a socket at all.
+ *
+ * This is a guard against a crash, not a nicety. `app.config.ts` strips
+ * INTERNET from every profile except `development` and `assisted-apk`, and a
+ * `fetch` in a build without it does not fail politely: OkHttp raises a
+ * SecurityException on its own dispatcher thread, which is not an IOException,
+ * so React Native's networking module does not catch it and the process dies.
+ * There is no JavaScript `catch` that can save you after the call is made —
+ * the only fix is not to make it.
+ *
+ * INTERNET is an install-time permission, so `check` answers whether it is in
+ * the manifest. Checked once and remembered: it cannot change while the app is
+ * running.
+ */
+let networkAllowed: boolean | null = null;
+
+export async function hasNetworkPermission(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+  if (networkAllowed !== null) return networkAllowed;
+  try {
+    networkAllowed = await PermissionsAndroid.check(
+      'android.permission.INTERNET' as never,
+    );
+  } catch {
+    // If the check itself is unavailable, assume yes rather than disabling a
+    // working feature — the crash it guards against only happens on a build
+    // that deliberately removed the permission.
+    networkAllowed = true;
+  }
+  return networkAllowed;
+}
+
 /** A bare IPv4 address, `localhost`, or an mDNS `.local` name — i.e. this network. */
 function looksLocal(host: string): boolean {
   const bare = host.split(':')[0].toLowerCase();
@@ -116,12 +149,42 @@ function authHeaders(token: string | null): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function postJson(
+/**
+ * Uploads the photo as a multipart file part.
+ *
+ * Not base64 JSON, which is what this used to be and what worked fine on a LAN.
+ * Through a Cloudflare tunnel it does not, and the difference is stark —
+ * measured against the same server and the same photograph:
+ *
+ *     Content-Type: image/jpeg              -> 200
+ *     {"image": "<440 KB of base64>"}       -> 403 Forbidden
+ *
+ * The 403 comes from Cloudflare's managed rules, which treat a large base64 blob
+ * inside a JSON field as an attack payload. No header talks them out of it.
+ *
+ * A multipart file part is the ordinary shape for sending a photograph, so it
+ * passes, and it is better in two other ways: a third smaller, since base64
+ * inflates by 4/3, and React Native streams a `{ uri }` part through its native
+ * networking layer rather than materialising a half-megabyte string in
+ * JavaScript first.
+ *
+ * `Content-Type` is deliberately not set here. React Native fills it in with the
+ * generated multipart boundary; setting it by hand produces a header whose
+ * boundary does not match the body, and the server cannot parse it.
+ */
+async function postPhoto(
   url: string,
-  body: unknown,
+  fileUri: string,
   token: string | null,
   timeoutMs: number,
 ): Promise<Response> {
+  const form = new FormData();
+  form.append('photo', {
+    uri: fileUri,
+    name: 'photo.jpg',
+    type: 'image/jpeg',
+  } as unknown as Blob);
+
   // RN's fetch has no timeout of its own; without this a server that accepts the
   // connection and then stalls leaves the review screen spinning forever.
   const controller = new AbortController();
@@ -129,8 +192,8 @@ async function postJson(
   try {
     return await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-      body: JSON.stringify(body),
+      headers: authHeaders(token),
+      body: form,
       signal: controller.signal,
     });
   } finally {
@@ -146,9 +209,10 @@ async function postJson(
  * deliberately will not tell them apart for anyone who is not holding the
  * token. Since we might be, we can.
  */
-export type ServerCheck = 'ok' | 'unauthorised' | 'unreachable';
+export type ServerCheck = 'ok' | 'unauthorised' | 'unreachable' | 'noPermission';
 
 export async function checkServer(url: string, token: string | null): Promise<ServerCheck> {
+  if (!(await hasNetworkPermission())) return 'noPermission';
   await ensureLocalNetworkAccess();
   try {
     const controller = new AbortController();
@@ -194,17 +258,20 @@ function warningsFrom(reading: RemoteReading): OcrWarning[] {
  * nothing measured.
  */
 export async function readRemotely(
-  base64Jpeg: string,
+  fileUri: string,
   serverUrl: string,
   token: string | null,
 ): Promise<OcrResult> {
   const started = Date.now();
+  // Refuse rather than crash on a build that has no INTERNET permission. See
+  // hasNetworkPermission -- there is no catch that helps once the call is made.
+  if (!(await hasNetworkPermission())) throw new RemoteOcrError('noNetworkPermission');
   await ensureLocalNetworkAccess();
   let response: Response;
   try {
-    response = await postJson(
+    response = await postPhoto(
       `${normaliseBase(serverUrl)}/read`,
-      { image: base64Jpeg },
+      fileUri,
       token,
       TIMEOUT_MS,
     );

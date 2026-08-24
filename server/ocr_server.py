@@ -54,6 +54,8 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from email import policy as email_policy
+from email.parser import BytesParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from PIL import Image, ImageFilter, ImageOps
@@ -147,6 +149,56 @@ SCHEMA = {
     ],
     "additionalProperties": False,
 }
+
+
+def extract_image(body: bytes, content_type: str) -> bytes:
+    """
+    Pulls the JPEG out of whichever envelope it arrived in.
+
+    Three are accepted, and the order matters because the app uses the first:
+
+      multipart/form-data   what the app sends. React Native streams the file
+                            through its native networking layer, so the bytes
+                            never become a JavaScript string.
+      image/jpeg (or any
+      other content type)   raw bytes. What curl sends, and the easiest way to
+                            test the server by hand.
+      application/json      {"image": "<base64>"}. Kept for compatibility, but
+                            see the warning below before using it.
+
+    ## Why base64 JSON is no longer the app's path
+
+    It works perfectly on a LAN and fails through a Cloudflare tunnel. Measured
+    against the same server and the same photograph:
+
+        POST with Content-Type: image/jpeg        -> 200
+        POST with {"image": "<440 KB of base64>"} -> 403 Forbidden
+
+    The 403 comes from Cloudflare, not from here. A large base64 blob inside a
+    JSON field is a shape their managed rules treat as an attack payload, and
+    there is no header you can set to talk them out of it. A multipart file
+    upload is the ordinary shape for sending a photograph and passes cleanly --
+    and as a bonus it is a third smaller, since base64 inflates by 4/3.
+    """
+    if content_type.startswith("multipart/form-data"):
+        # Reconstruct just enough of a MIME document for the stdlib parser: it
+        # needs the Content-Type header (which carries the boundary) attached to
+        # the body it is parsing.
+        header = b"Content-Type: " + content_type.encode("utf-8") + b"\r\nMIME-Version: 1.0\r\n\r\n"
+        message = BytesParser(policy=email_policy.default).parsebytes(header + body)
+        for part in message.iter_parts():
+            payload = part.get_payload(decode=True)
+            if payload:
+                return payload
+        raise ValueError("multipart body contained no file part")
+
+    if content_type.startswith("application/json"):
+        try:
+            return base64.b64decode(json.loads(body.decode("utf-8"))["image"])
+        except Exception:
+            raise ValueError("expected a JSON body with an image field")
+
+    return body
 
 
 def decode(raw: bytes) -> Image.Image:
@@ -430,12 +482,11 @@ class Handler(BaseHTTPRequestHandler):
 
         raw = self.rfile.read(length)
         content_type = self.headers.get("Content-Type", "")
-        if content_type.startswith("application/json"):
-            try:
-                raw = base64.b64decode(json.loads(raw.decode("utf-8"))["image"])
-            except Exception:
-                self._send(400, {"error": "expected a JSON body with an image field"})
-                return
+        try:
+            raw = extract_image(raw, content_type)
+        except ValueError as error:
+            self._send(400, {"error": str(error)})
+            return
 
         started = time.time()
         try:

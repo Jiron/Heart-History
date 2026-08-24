@@ -124,7 +124,10 @@ export async function scanImage(
 
   if (useAssisted) {
     try {
-      result = await readRemotely(saved.base64, serverUrl as string, serverToken ?? null);
+      // The file, not its base64: React Native streams a multipart part
+      // natively, and the base64 is only needed if we fall back to reading
+      // on the device below.
+      result = await readRemotely(saved.uri, serverUrl as string, serverToken ?? null);
       reader = 'assisted';
     } catch (error) {
       // Not fatal. The device recogniser is worse on hard photos but it is
