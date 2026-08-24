@@ -22,7 +22,11 @@
     "build:dev": "npx eas-cli build --platform android --profile development",
     "ocr:real": "tsx tools/ocr-real.ts",
     "build:apk:assisted": "npx eas-cli build --platform android --profile assisted-apk",
-    "ocr:folders": "tsx tools/ocr-folders.ts"
+    "ocr:folders": "tsx tools/ocr-folders.ts",
+    "ocr:server": "powershell -ExecutionPolicy Bypass -File server/ocr.ps1 status",
+    "ocr:server:start": "powershell -ExecutionPolicy Bypass -File server/ocr.ps1 start",
+    "ocr:server:stop": "powershell -ExecutionPolicy Bypass -File server/ocr.ps1 stop",
+    "ocr:server:restart": "powershell -ExecutionPolicy Bypass -File server/ocr.ps1 restart"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

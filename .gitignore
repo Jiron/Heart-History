@@ -51,3 +51,6 @@ __pycache__/
 
 # The assisted reader's access token — generated per machine, never shared
 server/token.txt
+
+# Logs from the optional local server — no readings in them, but no reason to track them
+server/logs/

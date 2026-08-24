@@ -55,7 +55,48 @@ curl -L -o D:/AiApiStuff/models/mmproj-Qwen3VL-8B-Instruct-F16.gguf "https://hug
 
 ## Running it
 
-Two processes. Start the model first; it takes a few seconds to load.
+One script manages both processes:
+
+```bash
+npm run ocr:server:start
+```
+
+```bash
+npm run ocr:server:stop
+```
+
+`npm run ocr:server` prints status; `ocr:server:restart` does both. Or call it
+directly, which is the same thing and takes `-ShowToken`:
+
+```bash
+powershell -ExecutionPolicy Bypass -File server/ocr.ps1 status -ShowToken
+```
+
+`start` waits for the model to load, then prints where the app should point and
+the first characters of the token:
+
+```
+  model    running  pid 52672  on Vulkan0
+  reader   running  pid 60256  on :6000
+  health   answering
+  vram     42.3 GB dedicated in use on the busiest adapter
+  ram      662 MB working set
+  token    JhDiwU...  (-ShowToken for the full value)
+
+  In the app, Settings -> Assisted reading:  192.168.1.100:6000
+```
+
+**`stop` matches on the model filename, not the process name.** There is more
+than one llama-server on this machine, and a `Stop-Process -Name llama-server`
+would take out whichever unrelated one happened to be running. That is the sort
+of thing you notice an hour later.
+
+Logs go to `server/logs/` (gitignored). They contain no readings — see the note
+under *What this costs you*.
+
+### Starting the halves separately
+
+Useful when working on one of them. `ocr.ps1` just runs these two:
 
 ```bash
 powershell -ExecutionPolicy Bypass -File server/start-vlm.ps1
@@ -63,15 +104,6 @@ powershell -ExecutionPolicy Bypass -File server/start-vlm.ps1
 
 ```bash
 python server/ocr_server.py
-```
-
-Then in the app: **Settings → Assisted reading**, enter the address and the
-token, and press *Test connection*.
-
-Print the token with:
-
-```bash
-python server/ocr_server.py --show-token
 ```
 
 Check it by hand without the app:

@@ -96,12 +96,18 @@ also the benchmark the on-device recogniser currently fails — see
 [assisted-reading.md](assisted-reading.md) — so treat a change there as
 significant.
 
-To measure the assisted reader instead, start both halves (see
-[server/README.md](../server/README.md)) and run:
+To measure the assisted reader instead, start it and run the grader:
+
+```bash
+npm run ocr:server:start
+```
 
 ```bash
 python tools/vlm-grade.py
 ```
+
+`npm run ocr:server:stop` when you are done, `npm run ocr:server` for status.
+Details in [server/README.md](../server/README.md).
 
 `ocr:debug` writes `photo.png`, `gray.png` and `mask.png`. The mask overlay draws
 detected bands in red and probed glyph cells in blue — looking at that image is
