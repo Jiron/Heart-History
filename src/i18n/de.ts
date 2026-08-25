@@ -442,6 +442,10 @@ export const de = {
     noDigits:
       'Keine Ziffern gefunden. Verringere Spiegelungen und fülle den Bildausschnitt.',
     noValueRows: 'Die Wertezeilen liessen sich nicht finden.',
+    readingsDisagreed:
+      'Das Foto wurde mehrfach ausgewertet und die Durchgänge waren sich bei mindestens einem Wert nicht einig. Lieber ein neues Foto mit weniger Spiegelung — oder den Wert von Hand eintragen.',
+    partialRead:
+      'Ein Teil der Anzeige war lesbar, der Rest nicht. Ergänze die fehlenden Werte von Hand oder mach ein neues Foto.',
     noDigitsRead: 'Die Anzeige wurde gefunden, aber keine Ziffer war lesbar.',
     recognitionFailed: 'Die Erkennung ist fehlgeschlagen.',
     errorCode: 'Die Anzeige zeigt offenbar einen Fehlercode und keine Messung.',

@@ -426,6 +426,10 @@ export const en: Dictionary = {
     noContent: 'No display-like content found. Move closer and fill the frame.',
     noDigits: 'Could not find any digits. Reduce glare and fill the frame.',
     noValueRows: 'Could not locate the value rows.',
+    readingsDisagreed:
+      'The photo was read several ways and they did not agree on at least one number. Take another with less glare, or type that value in.',
+    partialRead:
+      'Part of the display was readable and part was not. Fill in what is missing, or take another photo.',
     noDigitsRead: 'Found the display but could not read any digits.',
     recognitionFailed: 'Recognition failed.',
     errorCode: 'The display appears to be showing an error code, not a measurement.',

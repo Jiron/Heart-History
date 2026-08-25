@@ -148,6 +148,10 @@ export type OcrWarning =
   | { code: 'missingRows'; found: number }
   | { code: 'pulseUnreadable' }
   | { code: 'selfTest' }
+  /** Assisted reader only: the renderings named different numbers. */
+  | { code: 'readingsDisagreed' }
+  /** Some of the display was read and some was not. */
+  | { code: 'partialRead' }
   | { code: 'isAverage' };
 
 export interface OcrResult {
