@@ -296,6 +296,9 @@ export const de = {
     assistedUnauthorised:
       'Der Lese-Server hat das Token abgelehnt — die Anzeige wurde auf dem Gerät gelesen. Prüf das Token unter Einstellungen › Unterstütztes Lesen.',
     readByAssisted: 'Vom Lese-Server gelesen',
+    irregularTitle: 'Symbol für unregelmässigen Herzschlag',
+    irregularMessage:
+      'Das Messgerät zeigte sein Symbol für einen unregelmässigen Herzschlag an, deshalb ist diese Messung entsprechend markiert. Gelegentlich ist das normal; wenn es häufiger auftritt, sprechen Sie es bei einer Ärztin oder einem Arzt an.',
   },
 
   form: {

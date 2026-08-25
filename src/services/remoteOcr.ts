@@ -38,6 +38,14 @@ interface RemoteReading {
   systolic: number | null;
   diastolic: number | null;
   pulse: number | null;
+  /**
+   * Whether the monitor's irregular-heartbeat symbol was lit.
+   *
+   * Null rather than false when the display could not be read: "we could not
+   * tell" and "the symbol was not showing" are different answers, and only the
+   * second one belongs in a medical history.
+   */
+  irregularHeartbeat: boolean | null;
   reason: string | null;
   warnings: string[];
   elapsedMs: number;
@@ -342,7 +350,9 @@ export async function readRemotely(
     icons: {
       average: null,
       memory: null,
-      irregularHeartbeat: null,
+      // The one symbol the server is asked about. The rest are not in its
+      // schema, so null here means "never looked", not "not showing".
+      irregularHeartbeat: reading.irregularHeartbeat ?? null,
       cuffFitOk: null,
       batteryLow: null,
       trafficLight: null,

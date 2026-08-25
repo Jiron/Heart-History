@@ -7,9 +7,10 @@ Grades the vision model against the real photographs in tools/fixtures.
 
 Needs both halves running: start-vlm.ps1, then ocr_server.py.
 
-Folders are named sys-dia-pul and every photo inside shows that reading. The
-loose files at the top level are the older fixtures and are described by
-expected.json.
+Folders are named sys-dia-pul and every photo inside shows that reading. Anything
+the folder name cannot say -- currently just whether the irregular-heartbeat
+symbol is lit -- goes in a folder.json beside the photos. The loose files at the
+top level are the older fixtures and are described by expected.json.
 
 Two numbers matter, and they are not equally important:
 
@@ -18,6 +19,15 @@ Two numbers matter, and they are not equally important:
   WRONG     how many produced a reading that was not what the display said. This
             puts a number the user never measured into their medical history,
             where nothing later will question it. It has to be zero.
+
+The irregular-heartbeat symbol is graded on the same footing, and its two errors
+are not equal either:
+
+  missed        the symbol was lit and the reading came back without it. Loses
+                information the user would have had to notice themselves.
+  false alarm   the symbol was not lit and the reading claims it was. Puts a
+                cardiac finding in a history that no measurement supports, so
+                this is the one that has to stay at zero.
 """
 
 from __future__ import annotations
@@ -90,16 +100,21 @@ def cases(only: str | None) -> list[tuple[str, str, dict]]:
         if only and entry != only:
             continue
         systolic, diastolic, pulse = (int(part) for part in entry.split("-"))
+
+        # Whatever the folder name cannot carry. Absent means an ordinary
+        # measurement: no symbol lit.
+        extra = {}
+        marker = os.path.join(folder, "folder.json")
+        if os.path.exists(marker):
+            with open(marker, encoding="utf-8") as handle:
+                extra = {k: v for k, v in json.load(handle).items() if not k.startswith("$")}
+
         for name in sorted(os.listdir(folder)):
             if not re.search(r"\.(jpe?g|png)$", name, re.I):
                 continue
-            out.append(
-                (
-                    entry,
-                    os.path.join(folder, name),
-                    {"file": name, "sys": systolic, "dia": diastolic, "pul": pulse},
-                )
-            )
+            expectation = {"file": name, "sys": systolic, "dia": diastolic, "pul": pulse}
+            expectation.update(extra)
+            out.append((entry, os.path.join(folder, name), expectation))
     return out
 
 
@@ -119,6 +134,9 @@ def main() -> int:
     exact = 0
     wrong = 0
     pulse_wrong = 0
+    ihb_found = 0
+    ihb_missed = 0
+    ihb_false = 0
     elapsed_total = 0
     failures: list[str] = []
     group = None
@@ -161,11 +179,23 @@ def main() -> int:
                 print("  %-30s %-14s WRONGLY ACCEPTED" % (expected["file"][:30], got))
                 continue
 
+            want_ihb = bool(expected.get("irregular"))
+            got_ihb = bool(result.get("irregularHeartbeat"))
+            if want_ihb and got_ihb:
+                ihb_found += 1
+            elif want_ihb:
+                ihb_missed += 1
+                failures.append("%s: irregular-heartbeat symbol was lit and was not reported" % expected["file"])
+            elif got_ihb:
+                ihb_false += 1
+                failures.append("%s: reported an irregular heartbeat that was not on the display" % expected["file"])
+            mark = "  irregular" if got_ihb else ("  MISSED-IHB" if want_ihb else "")
+
             bp_ok = result["systolic"] == expected["sys"] and result["diastolic"] == expected["dia"]
             pulse_ok = result["pulse"] is None or result["pulse"] == expected.get("pul")
             if bp_ok and pulse_ok:
                 exact += 1
-                print("  %-30s %-14s ok  %dms" % (expected["file"][:30], got, result["elapsedMs"]))
+                print("  %-30s %-14s ok  %dms%s" % (expected["file"][:30], got, result["elapsedMs"], mark))
             else:
                 if not bp_ok:
                     wrong += 1
@@ -183,6 +213,9 @@ def main() -> int:
     print("  fully correct          %d  (%.0f%%)" % (exact, 100.0 * exact / max(1, total)))
     print("  blood pressure WRONG   %d      <- must stay 0" % wrong)
     print("  pulse wrong            %d" % pulse_wrong)
+    if ihb_found or ihb_missed or ihb_false:
+        print("  irregular found        %d of %d" % (ihb_found, ihb_found + ihb_missed))
+        print("  irregular FALSE ALARM  %d      <- must stay 0" % ihb_false)
     if got_reading:
         print("  mean time              %d ms" % (elapsed_total / max(1, total)))
 
@@ -191,7 +224,7 @@ def main() -> int:
         for line in failures:
             print("    - %s" % line)
     print("")
-    return 1 if wrong else 0
+    return 1 if (wrong or ihb_false) else 0
 
 
 if __name__ == "__main__":
