@@ -152,14 +152,21 @@ credentials safe.
 
 ### The others
 
-| Command | Profile | Output | For |
-|---|---|---|---|
-| `npm run build:apk` | `preview` | APK | sharing and sideloading |
-| `npm run build:apk:prod` | `production-apk` | APK | a release build, still sideloadable |
-| `npm run build:aab` | `production` | AAB | uploading to Google Play |
-| `npm run build:dev` | `development` | APK | a dev client (needs Metro) |
-| `npm run build:apk:local` | `preview`, local | APK | building on this machine |
-| `npm run build:apk:assisted` | `assisted-apk` | APK | using a self-hosted reading server |
+| Command | Profile | Output | Network | For |
+|---|---|---|---|---|
+| `npm run build:apk` | `preview` | APK | no | sharing and sideloading |
+| `npm run build:apk:prod` | `production-apk` | APK | **no** | a release build, still sideloadable |
+| `npm run build:aab` | `production` | AAB | no | uploading to Google Play |
+| `npm run build:dev` | `development` | APK | yes | a dev client (needs Metro) |
+| `npm run build:apk:local` | `preview`, local | APK | no | building on this machine |
+| `npm run build:apk:assisted` | `assisted-apk` | APK | **yes** | using a self-hosted reading server |
+
+**If you use a reading server, the production build you want is
+`build:apk:assisted`, not `build:apk:prod`.** Both are the `production` config;
+only the first has `INTERNET`. Installing the second over the first produces an
+app that starts fine, reads photos on the device, and reports the server as
+unreachable forever — with nothing on screen to suggest the binary is the
+reason. See *The network permission* below.
 
 The cloud build needs nothing installed locally. `build:apk:local` builds on this
 machine instead, which means it needs the Android SDK and a **JDK 17** — see the
