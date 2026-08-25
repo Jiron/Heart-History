@@ -124,6 +124,7 @@ function Navigation() {
         <Stack.Screen name="entry" options={{ title: t.screens.entry }} />
         <Stack.Screen name="reading/[id]" options={{ title: t.screens.reading }} />
         <Stack.Screen name="profiles" options={{ title: t.screens.profiles }} />
+        <Stack.Screen name="ranges" options={{ title: t.bpRanges.title }} />
       </Stack>
     </>
   );

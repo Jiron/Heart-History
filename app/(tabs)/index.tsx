@@ -35,13 +35,12 @@ export default function DashboardScreen() {
   const theme = useTheme();
   const t = useTranslation();
   const insets = useSafeAreaInsets();
-  const { readings, settings, profile, profiles, refresh } = useAppState();
+  const { readings, thresholds, profile, profiles, refresh } = useAppState();
   const [refreshing, setRefreshing] = React.useState(false);
   // A scan started from the camera keeps running after that screen closes,
   // so it needs somewhere to be visible. See state/scanBuffer.
   const scan = useSyncExternalStore(subscribeToScan, getScanJob, getScanJob);
 
-  const scale = settings.classificationScale;
   const latest = readings[0] ?? null;
 
   const month = useMemo(() => {
@@ -51,10 +50,10 @@ export default function DashboardScreen() {
     );
     return {
       readings: inWindow,
-      summary: summarise(inWindow, scale),
+      summary: summarise(inWindow, thresholds),
       trend: trendOf(inWindow),
     };
-  }, [readings, scale]);
+  }, [readings, thresholds]);
 
   const weekAverage = useMemo(() => sevenDayAverage(readings), [readings]);
 
@@ -139,7 +138,7 @@ export default function DashboardScreen() {
           <CategoryPill
             systolic={latest.systolic}
             diastolic={latest.diastolic}
-            scale={scale}
+            thresholds={thresholds}
           />
 
           <Text
@@ -149,7 +148,7 @@ export default function DashboardScreen() {
               marginTop: 10,
             }}
           >
-            {t.categoryDescriptions[classify(latest.systolic, latest.diastolic, scale).key]}
+            {t.categoryDescriptions[classify(latest.systolic, latest.diastolic, thresholds).key]}
           </Text>
         </Card>
       ) : (
@@ -261,7 +260,7 @@ export default function DashboardScreen() {
               <ReadingListItem
                 key={r.id}
                 reading={r}
-                scale={scale}
+                thresholds={thresholds}
                 onPress={() => router.push({ pathname: '/reading/[id]', params: { id: r.id } })}
               />
             ))}

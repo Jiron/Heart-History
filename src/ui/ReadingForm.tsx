@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { RANGES } from '@/ocr/pipeline';
+import type { ThresholdSet } from '@/domain/classification';
 import type { Arm, Posture } from '@/domain/types';
 import { useTranslation, type Dictionary } from '@/i18n';
 import { formatDate, formatTime } from '@/lib/format';
@@ -103,11 +104,11 @@ export function draftProblem(draft: ReadingDraft, t: Dictionary): string | null 
 export function ReadingForm({
   draft,
   onChange,
-  scale,
+  thresholds,
 }: {
   draft: ReadingDraft;
   onChange: (next: ReadingDraft) => void;
-  scale: 'esh' | 'home';
+  thresholds: ThresholdSet;
 }) {
   const theme = useTheme();
   const t = useTranslation();
@@ -155,7 +156,7 @@ export function ReadingForm({
             <CategoryPill
               systolic={draft.systolic}
               diastolic={draft.diastolic}
-              scale={scale}
+              thresholds={thresholds}
             />
           </View>
         ) : null}

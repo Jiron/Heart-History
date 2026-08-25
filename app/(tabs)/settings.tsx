@@ -18,7 +18,8 @@ export default function SettingsScreen() {
   const theme = useTheme();
   const t = useTranslation();
   const insets = useSafeAreaInsets();
-  const { settings, updateSettings, readings, profile, profiles, refresh } = useAppState();
+  const { settings, updateSettings, thresholds, readings, profile, profiles, refresh } =
+    useAppState();
   const [busy, setBusy] = useState<string | null>(null);
   const [serverDraft, setServerDraft] = useState(settings.ocrServerUrl ?? '');
   const [tokenDraft, setTokenDraft] = useState(settings.ocrServerToken ?? '');
@@ -137,7 +138,7 @@ export default function SettingsScreen() {
 
       <Card>
         <SectionHeader title={t.settings.classification} />
-        <Row>
+        <Row style={{ flexWrap: 'wrap' }}>
           <Chip
             label={t.settings.scaleStandard}
             selected={settings.classificationScale === 'esh'}
@@ -148,11 +149,32 @@ export default function SettingsScreen() {
             selected={settings.classificationScale === 'home'}
             onPress={() => updateSettings({ classificationScale: 'home' })}
           />
+          <Chip
+            label={t.settings.scaleCustom}
+            selected={settings.classificationScale === 'custom'}
+            // Straight to the editor: choosing "custom" without seeing the
+            // numbers it now means would silently change every colour in the
+            // app, and there would be nothing on this screen to say what to.
+            onPress={() => router.push('/ranges')}
+          />
         </Row>
         <Text style={[styles.hint, { color: theme.colors.textFaint }]}>
           {settings.classificationScale === 'esh'
             ? t.settings.scaleStandardHint
-            : t.settings.scaleHomeHint}
+            : settings.classificationScale === 'home'
+              ? t.settings.scaleHomeHint
+              : t.settings.scaleCustomHint}
+        </Text>
+        <Button
+          title={t.bpRanges.open}
+          icon="options-outline"
+          variant="ghost"
+          fullWidth
+          style={{ marginTop: 12 }}
+          onPress={() => router.push('/ranges')}
+        />
+        <Text style={[styles.hint, { color: theme.colors.textFaint }]}>
+          {t.bpRanges.openHint}
         </Text>
       </Card>
 
@@ -287,7 +309,7 @@ export default function SettingsScreen() {
                   readings,
                   profile,
                   presetRange('all'),
-                  settings.classificationScale,
+                  thresholds,
                   t,
                 );
                 return null;
@@ -314,7 +336,7 @@ export default function SettingsScreen() {
             disabled={readings.length === 0}
             onPress={() =>
               run('csv', async () =>
-                t.settings.exportedCount(await exportCsv(t, settings.classificationScale)),
+                t.settings.exportedCount(await exportCsv(t, thresholds)),
               )
             }
           />

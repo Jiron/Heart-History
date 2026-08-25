@@ -27,7 +27,7 @@ export default function ReadingDetailScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { readings, editReading, removeReading, settings } = useAppState();
+  const { readings, editReading, removeReading, thresholds } = useAppState();
 
   const reading = useMemo(() => readings.find((r) => r.id === id) ?? null, [readings, id]);
 
@@ -73,7 +73,7 @@ export default function ReadingDetailScreen() {
     );
   }
 
-  const category = classify(reading.systolic, reading.diastolic, settings.classificationScale);
+  const category = classify(reading.systolic, reading.diastolic, thresholds);
 
   const save = async () => {
     if (!isDraftValid(draft) || draft.systolic === null || draft.diastolic === null) return;
@@ -124,7 +124,7 @@ export default function ReadingDetailScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
         keyboardShouldPersistTaps="handled"
       >
-        <ReadingForm draft={draft} onChange={setDraft} scale={settings.classificationScale} />
+        <ReadingForm draft={draft} onChange={setDraft} thresholds={thresholds} />
         {problem ? <Banner tone="danger" message={problem} /> : null}
         <Row>
           <Button
@@ -165,7 +165,7 @@ export default function ReadingDetailScreen() {
         <CategoryPill
           systolic={reading.systolic}
           diastolic={reading.diastolic}
-          scale={settings.classificationScale}
+          thresholds={thresholds}
         />
         <Text
           style={{ ...theme.typography.body, color: theme.colors.textMuted, marginTop: 10 }}

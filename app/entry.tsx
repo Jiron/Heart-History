@@ -21,7 +21,7 @@ export default function EntryScreen() {
   const theme = useTheme();
   const t = useTranslation();
   const insets = useSafeAreaInsets();
-  const { addReading, settings, profile } = useAppState();
+  const { addReading, thresholds, profile } = useAppState();
 
   const [draft, setDraft] = useState<ReadingDraft>(() => emptyDraft());
   const [saving, setSaving] = useState(false);
@@ -63,7 +63,7 @@ export default function EntryScreen() {
       contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
       keyboardShouldPersistTaps="handled"
     >
-      <ReadingForm draft={draft} onChange={setDraft} scale={settings.classificationScale} />
+      <ReadingForm draft={draft} onChange={setDraft} thresholds={thresholds} />
 
       {touched && problem ? <Banner tone="danger" message={problem} /> : null}
 

@@ -3,7 +3,8 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
 import type { DateRange } from '@/domain/statistics';
-import type { ClassificationScale, Profile, Reading } from '@/domain/types';
+import type { ThresholdSet } from '@/domain/classification';
+import type { Profile, Reading } from '@/domain/types';
 import type { Dictionary } from '@/i18n';
 import { toISODate } from '@/lib/format';
 
@@ -15,10 +16,10 @@ export async function exportReport(
   readings: Reading[],
   profile: Profile,
   range: DateRange,
-  scale: ClassificationScale,
+  thresholds: ThresholdSet,
   t: Dictionary,
 ): Promise<void> {
-  const html = buildReportHtml(readings, profile, range, scale, t);
+  const html = buildReportHtml(readings, profile, range, thresholds, t);
   const { uri } = await Print.printToFileAsync({ html, base64: false });
 
   /*

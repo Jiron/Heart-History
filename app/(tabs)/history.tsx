@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { classify, type BpCategory } from '@/domain/classification';
+import { classify } from '@/domain/classification';
 import {
   customRange,
   groupByDay,
@@ -46,8 +46,7 @@ export default function HistoryScreen() {
   const theme = useTheme();
   const t = useTranslation();
   const insets = useSafeAreaInsets();
-  const { readings, settings } = useAppState();
-  const scale = settings.classificationScale;
+  const { readings, thresholds } = useAppState();
 
   const [rangeKey, setRangeKey] = useState<RangeKey>('30d');
   const [custom, setCustom] = useState<{ from: number; to: number }>(() => ({
@@ -69,11 +68,11 @@ export default function HistoryScreen() {
     return readings.filter((r) => {
       if (!inRange(r, range)) return false;
       if (band === 'all') return true;
-      return classify(r.systolic, r.diastolic, scale).band === band;
+      return classify(r.systolic, r.diastolic, thresholds).band === band;
     });
-  }, [readings, range, band, scale]);
+  }, [readings, range, band, thresholds]);
 
-  const summary = useMemo(() => summarise(filtered, scale), [filtered, scale]);
+  const summary = useMemo(() => summarise(filtered, thresholds), [filtered, thresholds]);
 
   const sections = useMemo(
     () =>
@@ -182,7 +181,7 @@ export default function HistoryScreen() {
           <View style={{ marginBottom: 8 }}>
             <ReadingListItem
               reading={item}
-              scale={scale}
+              thresholds={thresholds}
               onPress={() =>
                 router.push({ pathname: '/reading/[id]', params: { id: item.id } })
               }

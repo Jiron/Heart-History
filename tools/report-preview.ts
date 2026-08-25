@@ -18,6 +18,7 @@ import { presetRange } from '../src/domain/statistics';
 import type { Profile, Reading } from '../src/domain/types';
 import { de } from '../src/i18n/de';
 import { generateHistory } from './seed-demo';
+import { PRESETS } from '../src/domain/classification';
 
 function parseArgs(argv: string[]): Record<string, string> {
   const out: Record<string, string> = {};
@@ -45,7 +46,7 @@ function main() {
   };
 
   const readings: Reading[] = generateHistory(profile.id, days);
-  const html = buildReportHtml(readings, profile, presetRange('all'), 'esh', de);
+  const html = buildReportHtml(readings, profile, presetRange('all'), PRESETS.esh, de);
 
   const outDir = join(process.cwd(), 'tools', 'out');
   mkdirSync(outDir, { recursive: true });

@@ -1,5 +1,11 @@
-import { classify, type BpCategory, type CategoryInfo } from './classification';
-import type { ClassificationScale, Reading } from './types';
+import {
+  classify,
+  DEFAULT_THRESHOLDS,
+  type BpCategory,
+  type CategoryInfo,
+  type ThresholdSet,
+} from './classification';
+import type { Reading } from './types';
 
 // ---------------------------------------------------------------------------
 // Date ranges
@@ -105,7 +111,7 @@ function seriesStats(values: number[]): SeriesStats {
 
 export function summarise(
   readings: Reading[],
-  scale: ClassificationScale = 'esh',
+  thresholds: ThresholdSet = DEFAULT_THRESHOLDS,
 ): Summary {
   if (readings.length === 0) {
     const empty = { mean: 0, min: 0, max: 0, sd: 0 };
@@ -128,7 +134,7 @@ export function summarise(
 
   const counts = new Map<BpCategory, number>();
   for (const r of readings) {
-    const c = classify(r.systolic, r.diastolic, scale).key;
+    const c = classify(r.systolic, r.diastolic, thresholds).key;
     counts.set(c, (counts.get(c) ?? 0) + 1);
   }
 
@@ -139,7 +145,7 @@ export function summarise(
     systolic,
     diastolic,
     pulse: pulses.length > 0 ? seriesStats(pulses) : null,
-    averageCategory: classify(Math.round(systolic.mean), Math.round(diastolic.mean), scale),
+    averageCategory: classify(Math.round(systolic.mean), Math.round(diastolic.mean), thresholds),
     distribution: [...counts.entries()]
       .map(([category, count]) => ({
         category,
