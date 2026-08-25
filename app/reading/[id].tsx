@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -180,6 +180,21 @@ export default function ReadingDetailScreen() {
         >
           {t.categoryDescriptions[category.key]}
         </Text>
+        {/*
+          Here rather than only in Settings, because this is where the question
+          gets asked: someone reading "grade 2" on their own measurement wants
+          to know what that means now, not after finding a settings screen.
+        */}
+        <Pressable
+          onPress={() => router.push('/ranges')}
+          accessibilityRole="link"
+          hitSlop={8}
+          style={{ marginTop: 8, alignSelf: 'flex-start' }}
+        >
+          <Text style={{ ...theme.typography.label, color: theme.colors.accent }}>
+            {t.bpRanges.whatDoesThisMean}
+          </Text>
+        </Pressable>
       </Card>
 
       {reading.imageUri ? (

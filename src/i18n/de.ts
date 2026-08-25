@@ -119,6 +119,7 @@ export const de = {
     title: 'Blutdruck-Bereiche',
     open: 'Bereiche und Grenzwerte',
     openHint: 'Nachschauen, was «optimal» oder «Grad 1» bedeutet — und die Grenzen bei Bedarf anpassen.',
+    whatDoesThisMean: 'Was bedeutet das? →',
     whichScale: 'Welche Skala',
     tableTitle: 'Die Bereiche',
     category: 'Kategorie',
