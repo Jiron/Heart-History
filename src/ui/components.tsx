@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -400,6 +401,66 @@ export function Row({
   style?: StyleProp<ViewStyle>;
 }) {
   return <View style={[{ flexDirection: 'row', gap }, style]}>{children}</View>;
+}
+
+/**
+ * The photograph a reading was scanned from, shown whole.
+ *
+ * Cropping it to a fixed height is the obvious thing and it is wrong here. On a
+ * monitor photographed upright the first thing a centre crop removes is the
+ * systolic row -- the number the photo is being kept to corroborate. So the
+ * natural size is measured and the image is rendered at its own aspect ratio,
+ * which also avoids the letterbox bars a `contain` fit would leave.
+ *
+ * `fallbackHeight` is what shows while the measurement is in flight, and if it
+ * fails: a URI that cannot be measured usually cannot be drawn either, and a
+ * box of that height is a more honest placeholder than a collapsed one.
+ */
+export function ReadingPhoto({
+  uri,
+  label,
+  fallbackHeight = 240,
+}: {
+  uri: string;
+  label: string;
+  fallbackHeight?: number;
+}) {
+  const theme = useTheme();
+  // The measurement is stored *with* the uri it belongs to, and a mismatch is
+  // read as "not measured yet". Clearing it in the effect instead would show
+  // the previous photo's shape for a frame after the uri changes -- and is a
+  // synchronous setState during an effect, which cascades a render.
+  const [measured, setMeasured] = React.useState<{ uri: string; ratio: number } | null>(null);
+  const ratio = measured?.uri === uri ? measured.ratio : null;
+
+  React.useEffect(() => {
+    let cancelled = false;
+    Image.getSize(
+      uri,
+      (width, height) => {
+        if (!cancelled && height > 0) setMeasured({ uri, ratio: width / height });
+      },
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [uri]);
+
+  return (
+    <Card padded={false} style={{ overflow: 'hidden' }}>
+      <Image
+        source={{ uri }}
+        style={
+          ratio
+            ? { width: '100%', aspectRatio: ratio }
+            : { width: '100%', height: fallbackHeight, backgroundColor: theme.colors.background }
+        }
+        resizeMode={ratio ? 'cover' : 'contain'}
+        accessibilityLabel={label}
+      />
+    </Card>
+  );
 }
 
 export function Muted({ children, style }: { children: React.ReactNode; style?: StyleProp<TextStyle> }) {

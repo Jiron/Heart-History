@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,15 @@ import { classify } from '@/domain/classification';
 import { formatDate, formatTime } from '@/lib/format';
 import { useTranslation } from '@/i18n';
 import { useAppState } from '@/state/AppState';
-import { Banner, Button, Card, EmptyState, Row, SectionHeader } from '@/ui/components';
+import {
+  Banner,
+  Button,
+  Card,
+  EmptyState,
+  ReadingPhoto,
+  Row,
+  SectionHeader,
+} from '@/ui/components';
 import {
   draftProblem,
   emptyDraft,
@@ -175,14 +183,7 @@ export default function ReadingDetailScreen() {
       </Card>
 
       {reading.imageUri ? (
-        <Card padded={false} style={{ overflow: 'hidden' }}>
-          <Image
-            source={{ uri: reading.imageUri }}
-            style={styles.photo}
-            resizeMode="cover"
-            accessibilityLabel={t.detail.photoAlt}
-          />
-        </Card>
+        <ReadingPhoto uri={reading.imageUri} label={t.detail.photoAlt} />
       ) : null}
 
       <Card>
@@ -306,7 +307,6 @@ function DetailRow({
 
 const styles = StyleSheet.create({
   content: { padding: 16, gap: 16 },
-  photo: { width: '100%', height: 220 },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   tagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 14 },
   tag: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 999 },

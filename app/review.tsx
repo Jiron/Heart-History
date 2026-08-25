@@ -11,7 +11,7 @@ import { formatDate } from '@/lib/format';
 import { persistPhoto } from '@/services/scan';
 import { useAppState } from '@/state/AppState';
 import { clearScan, getScanJob, subscribeToScan } from '@/state/scanBuffer';
-import { Banner, Button, Card, EmptyState, Row } from '@/ui/components';
+import { Banner, Button, Card, EmptyState, ReadingPhoto, Row } from '@/ui/components';
 import {
   draftProblem,
   emptyDraft,
@@ -92,20 +92,11 @@ export default function ReviewScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background, padding: 16, gap: 16 }}>
         {/*
-          Fitted, not filled. The point of showing the photo here is "this is the
-          shot being read" -- and a cover crop of a portrait photo cuts the top
-          off, which on a monitor photographed upright is the systolic row. The
-          dimensions are not known until the read returns, so the box is fixed
-          and the photo is letterboxed inside it.
+          Whole, not cropped. The point of showing the photo here is "this is the
+          shot being read", and a cover crop of a portrait photo removes the top
+          -- which on a monitor photographed upright is the systolic row.
         */}
-        <Card padded={false} style={{ overflow: 'hidden' }}>
-          <Image
-            source={{ uri: job.sourceUri }}
-            style={{ width: '100%', height: 300, backgroundColor: theme.colors.background }}
-            resizeMode="contain"
-            accessibilityLabel={t.review.photoAlt}
-          />
-        </Card>
+        <ReadingPhoto uri={job.sourceUri} label={t.review.photoAlt} fallbackHeight={300} />
         <Card>
           <Row style={{ alignItems: 'center', gap: 12 }}>
             <ActivityIndicator color={theme.colors.accent} />
