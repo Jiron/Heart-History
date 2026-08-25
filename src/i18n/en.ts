@@ -114,6 +114,7 @@ export const en: Dictionary = {
     title: 'Blood pressure ranges',
     open: 'Ranges and thresholds',
     openHint: 'Look up what “optimal” or “grade 1” means — and move the lines if you need to.',
+    whatDoesThisMean: 'What does this mean? →',
     whichScale: 'Which scale',
     tableTitle: 'The ranges',
     category: 'Category',
