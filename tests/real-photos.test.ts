@@ -132,19 +132,26 @@ const folders = existsSync(FIXTURE_DIR)
       })
   : [];
 
+/**
+ * One test per folder, not one over all of them.
+ *
+ * Each photograph is decoded and run through the recogniser several times, so
+ * the work grows with the fixture set -- and as a single test it eventually ran
+ * past the suite timeout, which reports as a failure that says nothing about
+ * any photograph. Per folder the budget applies to a bounded amount of work,
+ * and a failure names the reading it was looking at.
+ */
 describe.skipIf(folders.length === 0)('photographs of a known reading', () => {
-  it('never reports a blood pressure the display did not show', () => {
-    for (const folder of folders) {
-      for (const file of folder.files) {
-        const path = join(FIXTURE_DIR, folder.name, file);
-        for (const variant of LOAD_VARIANTS) {
-          const result = recognise(loadAsDeviceWould(path, variant.options));
-          if (!result.ok) continue;
-          const where = `${folder.name}/${file} [${variant.label}]`;
-          expect(result.systolic, where).toBe(folder.sys);
-          expect(result.diastolic, where).toBe(folder.dia);
-          if (result.pulse !== null) expect(result.pulse, where).toBe(folder.pul);
-        }
+  it.each(folders)('never misreads $name', (folder) => {
+    for (const file of folder.files) {
+      const path = join(FIXTURE_DIR, folder.name, file);
+      for (const variant of LOAD_VARIANTS) {
+        const result = recognise(loadAsDeviceWould(path, variant.options));
+        if (!result.ok) continue;
+        const where = `${folder.name}/${file} [${variant.label}]`;
+        expect(result.systolic, where).toBe(folder.sys);
+        expect(result.diastolic, where).toBe(folder.dia);
+        if (result.pulse !== null) expect(result.pulse, where).toBe(folder.pul);
       }
     }
   });

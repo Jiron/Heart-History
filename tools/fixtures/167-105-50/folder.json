@@ -1,0 +1,12 @@
+{
+  "$comment": [
+    "Extra expectations for every photo in this folder; the folder name already",
+    "carries sys-dia-pul. Only what the numbers cannot say goes here.",
+    "",
+    "  irregular   the monitor's irregular-heartbeat symbol is lit -- the small",
+    "              rounded square with an ECG trace, on the left of the panel",
+    "              level with the SYS row. It is showing in all ten of these and",
+    "              in none of the other fixtures."
+  ],
+  "irregular": true
+}

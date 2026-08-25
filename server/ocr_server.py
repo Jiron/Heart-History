@@ -150,6 +150,15 @@ Rules you must follow:
 5. If the display is cut off, too blurred, too dark or otherwise not legible, set the numbers you cannot read to null. Reporting null is correct and useful. Guessing is not.
 6. Report only what is on the display.
 
+The irregular-heartbeat symbol:
+Along the LEFT edge of the panel, to the left of the big numbers, the monitor can show a small rounded-square icon containing a heartbeat waveform - a wavy ECG line with a sharp spike, like the trace on a heart monitor. It sits roughly level with the top (SYS) number. Set irregular_heartbeat to true if that icon is visible, false if it is not.
+It is small and low contrast: dark grey on the grey-green background of the LCD. Look carefully at that area before deciding.
+Do NOT confuse it with any of these, none of which mean an irregular heartbeat:
+  - a small circle containing a tick, lower down the left edge (the cuff-fit check)
+  - the letter M in a circle near the top (a stored reading)
+  - a small solid triangle at the left edge (the traffic-light pointer)
+
+
 Answer with JSON only."""
 
 SCHEMA = {
@@ -158,6 +167,7 @@ SCHEMA = {
         "systolic": {"type": ["integer", "null"]},
         "diastolic": {"type": ["integer", "null"]},
         "pulse": {"type": ["integer", "null"]},
+        "irregular_heartbeat": {"type": "boolean"},
         "all_segments_lit": {"type": "boolean"},
         "display_legible": {"type": "boolean"},
     },
@@ -165,6 +175,7 @@ SCHEMA = {
         "systolic",
         "diastolic",
         "pulse",
+        "irregular_heartbeat",
         "all_segments_lit",
         "display_legible",
     ],
@@ -344,6 +355,42 @@ RENDERINGS = (
 )
 
 
+def zoom(image: Image.Image, fraction: float = 0.70) -> Image.Image:
+    """
+    The middle of the frame, blown back up to full size.
+
+    Only the irregular-heartbeat icon is read from this. That icon is perhaps
+    forty pixels across in the original and a dozen after the downscale to 1280,
+    and on the shots where the monitor sits small in the frame it stops being
+    resolvable -- one photo here was missed by all four full-frame renderings
+    and by a 1792-pixel version of the same, and caught by every crop tried.
+
+    ## Why its numbers are thrown away
+
+    A centre crop can slice a digit, and half a digit reads as a different
+    digit: a 6 with its left edge gone is a 5. That is precisely the
+    confident-wrong-number failure `consensus` exists to prevent, so letting
+    this pass vote on the values would take a real risk for no gain -- the four
+    full-frame renderings already read the numbers well. It answers one
+    question, and only that one.
+    """
+    width, height = image.size
+    box = (
+        int(width * (1 - fraction) / 2),
+        int(height * (1 - fraction) / 2),
+        int(width * (1 + fraction) / 2),
+        int(height * (1 + fraction) / 2),
+    )
+    cropped = image.crop(box)
+    scale = MAX_DIM / max(cropped.size)
+    if scale > 1:
+        cropped = cropped.resize(
+            (round(cropped.width * scale), round(cropped.height * scale)),
+            Image.LANCZOS,
+        )
+    return cropped
+
+
 def ask_model(b64: str, timeout: float = 180.0) -> dict:
     payload = {
         "model": "heart-history-vlm",
@@ -417,16 +464,45 @@ def consensus(votes: list, minimum: int) -> tuple[int | None, bool]:
     return (value, False) if len(seen) >= minimum else (None, False)
 
 
-def agree(answers: list[dict]) -> dict:
+def saw_icon(answers: list[dict]) -> bool:
+    """
+    True if *any* reading saw the irregular-heartbeat symbol.
+
+    The opposite rule to the numbers, and for a measured reason. Across 200
+    readings of photographs where the symbol was **not** showing -- ten monitors
+    photographed under varied light, every rendering, both resolutions, every
+    crop -- the model reported it zero times. It does not invent this icon.
+
+    What it does do is miss it: on the ten photographs where the symbol *was*
+    lit, a single full-frame rendering found it eight times. The error is
+    entirely one-directional, so requiring agreement here would throw away the
+    only thing the extra renderings are contributing. One sighting is taken as a
+    sighting.
+
+    The remaining risk is the mirror image: a flag set from one rendering that
+    the other four disagreed with. That lands in front of the user as a
+    pre-ticked switch on the review screen, beside the photograph it came from,
+    and costs one tap to correct. A missed flag, by contrast, is invisible -- and
+    it is the one the user asked for.
+    """
+    return any(answer.get("irregular_heartbeat") for answer in answers)
+
+
+def agree(answers: list[dict], icon_answers: list[dict] | None = None) -> dict:
     """
     Folds several readings of the same photo into one, or into a refusal.
 
     A single reading passes through unchanged, so `--passes 1` measures the model
     on its own. With more, a value has to be named by a majority and contradicted
     by nobody.
+
+    `icon_answers` are extra looks that may only vote on the symbol -- see
+    `zoom`.
     """
+    icon = saw_icon(answers + list(icon_answers or []))
+
     if len(answers) == 1:
-        return dict(answers[0])
+        return dict(answers[0], irregular_heartbeat=icon)
 
     # One rendering seeing an all-lit display is enough to stop: the self test is
     # unmistakable when it is there, so a single sighting is far more likely to
@@ -447,6 +523,7 @@ def agree(answers: list[dict]) -> dict:
         "systolic": systolic,
         "diastolic": diastolic,
         "pulse": pulse,
+        "irregular_heartbeat": icon,
         "all_segments_lit": False,
         "warnings": warnings,
     }
@@ -471,6 +548,10 @@ def validate(raw: dict) -> dict:
             "systolic": None,
             "diastolic": None,
             "pulse": None,
+            # Not false. Nothing was measured, so there is no symbol to have
+            # seen, and reporting false here would put "no irregular heartbeat"
+            # on a photograph of a self test.
+            "irregularHeartbeat": None,
             "reason": "selfTest",
             "warnings": ["allSegmentsLit"],
         }
@@ -494,6 +575,9 @@ def validate(raw: dict) -> dict:
         "systolic": systolic,
         "diastolic": diastolic,
         "pulse": pulse,
+        # Only meaningful next to a reading. Offered on a refusal it would be a
+        # claim about a display nobody could read.
+        "irregularHeartbeat": bool(raw.get("irregular_heartbeat")) if ok else None,
         "reason": None if ok else "illegible",
         "warnings": warnings,
     }
@@ -620,7 +704,13 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, {"error": safe})
             return
 
-        renderings = RENDERINGS[: max(1, self.passes)]
+        renderings = list(RENDERINGS[: max(1, self.passes)])
+        # A fifth look, at the middle of the frame magnified, whose only job is
+        # the irregular-heartbeat symbol. Skipped when running reduced passes,
+        # since --passes is how the model gets measured on its own.
+        if self.passes >= len(RENDERINGS):
+            renderings.append(("zoom", zoom))
+
         answers = []
         try:
             for label, render in renderings:
@@ -638,7 +728,13 @@ class Handler(BaseHTTPRequestHandler):
             self._send(502, {"error": "vision model failed: %s" % error})
             return
 
-        result = validate(agree(answers))
+        # The zoom pass is split out here rather than filtered inside `agree`,
+        # so the rule -- this one may only vote on the symbol -- is visible at
+        # the place the two lists are built.
+        full_frame = [a for (label, _), a in zip(renderings, answers) if label != "zoom"]
+        icon_only = [a for (label, _), a in zip(renderings, answers) if label == "zoom"]
+
+        result = validate(agree(full_frame, icon_only))
         result["elapsedMs"] = int((time.time() - started) * 1000)
         result["source"] = "vlm"
         result["renderings"] = [
@@ -647,6 +743,8 @@ class Handler(BaseHTTPRequestHandler):
                 "sys": answer.get("systolic"),
                 "dia": answer.get("diastolic"),
                 "pul": answer.get("pulse"),
+                "ihb": answer.get("irregular_heartbeat"),
+                "iconOnly": label == "zoom",
             }
             for (label, _), answer in zip(renderings, answers)
         ]
@@ -664,13 +762,14 @@ class Handler(BaseHTTPRequestHandler):
         # so that is the one mode where the values are printed too.
         if self.debug_dir:
             sys.stderr.write(
-                "read %dx%d -> %s/%s/%s ok=%s in %dms\n"
+                "read %dx%d -> %s/%s/%s%s ok=%s in %dms\n"
                 % (
                     image.width,
                     image.height,
                     result["systolic"],
                     result["diastolic"],
                     result["pulse"],
+                    " irregular" if result.get("irregularHeartbeat") else "",
                     result["ok"],
                     result["elapsedMs"],
                 )

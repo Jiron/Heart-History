@@ -285,6 +285,9 @@ export const en: Dictionary = {
     assistedUnauthorised:
       'The reading server rejected the token, so the display was read on the device. Check the token under Settings › Assisted reading.',
     readByAssisted: 'Read by your reading server',
+    irregularTitle: 'Irregular heartbeat symbol',
+    irregularMessage:
+      'The monitor was showing its irregular-heartbeat symbol, so this reading has been marked accordingly. An occasional flag is common; if it keeps appearing, mention it to a doctor.',
   },
 
   form: {

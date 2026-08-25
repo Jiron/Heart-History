@@ -254,6 +254,20 @@ export default function ReviewScreen() {
         />
       )}
 
+      {/*
+        Announced rather than left as a silently pre-ticked switch further down
+        the form. The app is setting a cardiac finding on the user's behalf, off
+        a symbol a few pixels wide, so it says so -- next to the photograph it
+        came from, and above the switch that turns it off.
+      */}
+      {result.icons.irregularHeartbeat === true ? (
+        <Banner
+          tone="info"
+          title={t.review.irregularTitle}
+          message={t.review.irregularMessage}
+        />
+      ) : null}
+
       <Card padded={false} style={{ overflow: 'hidden' }}>
         <Image
           source={{ uri: outcome.previewUri }}
