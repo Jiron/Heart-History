@@ -163,6 +163,83 @@ said `104`. Histogram equalisation reads it as `88`. Neither is right and the ro
 is not recoverable, but the two now disagree, and disagreement is what turns a
 confident wrong number into a dropped field.
 
+### The 37-photo run
+
+After the `167-105-50` folder was added (ten photographs, irregular-heartbeat
+symbol lit in all of them):
+
+```
+photos graded          37
+produced a reading     33  (89%)
+fully correct          34  (92%)
+blood pressure WRONG    0      <- must stay 0
+pulse wrong             0
+irregular found         9 of 9
+irregular FALSE ALARM   0      <- must stay 0
+mean time           14796 ms
+```
+
+The four refusals are the three splits above plus `182627`, a shot with a dark
+reflection across the whole panel where the renderings split on DIA. Adding the
+symbol to the prompt did not cost anything on the numbers: the two older folders
+read exactly as before.
+
+---
+
+## The irregular-heartbeat symbol
+
+The monitor lights a small rounded square containing an ECG trace, on the left of
+the panel level with the SYS row, when it detected an irregular beat during the
+measurement. It is perhaps forty pixels across in a 3072-pixel-wide photo, a
+dozen after the downscale to 1280, and low contrast — dark grey on the
+grey-green LCD.
+
+### The model misses it; it does not invent it
+
+Measured over the ten photographs where it is lit and the twenty-seven where it
+is not:
+
+| | Found (of 10) | False alarms (of 27) |
+|---|---|---|
+| One rendering, first prompt attempt | 5 | 0 |
+| One rendering, the prompt now in use | 8 | 0 |
+| Any of the four renderings | 8 | 0 |
+| Any of the four, plus the zoomed pass | 9* | 0 |
+| Centre crop at 70%, alone | 7 | 0 |
+| Centre crop at 55%, alone | 8 | 0 |
+
+\* the tenth is `182627`, which is refused outright — the numbers are not
+readable either.
+
+Roughly 200 readings of photographs without the symbol, across every rendering,
+two resolutions and four crops, produced **zero** false positives. That is the
+finding the whole design rests on: the error is one-directional.
+
+### So the rule is the opposite of the one the numbers use
+
+A **value** has to be named by a majority and contradicted by nobody, because a
+confident wrong number lands in a medical history unopposed. The **symbol** is
+taken from a single sighting, because requiring agreement would discard the only
+thing the extra renderings contribute, and because a wrongly-set flag arrives as
+a pre-ticked switch beside the photograph it came from and costs one tap.
+
+The review screen says so rather than quietly ticking it: a cardiac finding the
+app set on the user's behalf, off a symbol a few pixels wide, is announced above
+the photo and above the switch.
+
+### The zoomed pass
+
+A fifth look at the middle 70% of the frame, magnified back to 1280. It exists
+because of one photograph, `182614`, where the monitor sits small in the frame:
+missed by all four full-frame renderings *and* by a 1792-pixel version of the
+same image, and caught by every crop tried.
+
+Its numbers are thrown away. A centre crop can slice a digit, and a `6` with its
+left edge gone is a `5` — precisely the failure the consensus exists to prevent.
+It answers one question. Cost: about three seconds on top of eleven.
+
+`--passes` below four skips it, so the flag measures the model on its own.
+
 ---
 
 ## Access control
@@ -271,6 +348,31 @@ Not free, and the trade is real:
   The first is WDDM charging video allocations to process commit; the second is
   the carve plus a system-memory aperture, ignoring what is already committed.
   The dedicated-usage performance counter is the one that answers the question.
+- **Raising the resolution to find the symbol.** 1792 on the long side found it
+  in 5 of 10, *worse* than 1280's 8 of 10. More pixels is not more legible: the
+  vision tower resamples, and the extra detail arrives as noise. Cropping is
+  what works, because it changes what fraction of the tile the symbol occupies.
+- **Majority voting on the symbol.** Requiring two of four renderings to agree
+  drops it from 8 of 10 to 6 of 10 and prevents nothing — there were no false
+  positives to prevent.
+- **Reporting `irregularHeartbeat: false` on a refusal.** "We could not read the
+  display" and "the symbol was not showing" are different answers, and only the
+  second belongs in a history. The field is null when the reading is refused.
+- **Re-asking `--list-devices` to name the card in a status line.** Device
+  numbering is not stable *between enumerations either*: the model started on
+  `Vulkan0 (NVIDIA GeForce RTX 3060)` and a `--list-devices` minutes later
+  called `Vulkan0` the Radeon. `ocr.ps1 status` reads the name back from what
+  `start-vlm.ps1` recorded at launch, which is the only account made at the
+  moment the choice was made.
+- **Reporting the busiest adapter's VRAM.** With the iGPU carve in use by
+  something else it read 37 GB while the model held 7. The per-process
+  counter — `\GPU Process Memory(pid_N*)\Dedicated Usage` — answers the
+  question actually being asked.
+- **Setting `HH_VLM_GPU` inline from a shell that is already PowerShell.**
+  `powershell -Command "$env:HH_VLM_GPU='nvidia'; ./server/ocr.ps1 restart"`
+  expands the variable in the *outer* shell, to nothing, and hands the inner one
+  `='nvidia'` — a syntax error, after which the restart proceeds on the default
+  card and looks like it worked. Use `./server/ocr.ps1 restart -Gpu nvidia`.
 - **Hardcoding a GPU index.** llama.cpp's device numbering is not stable —
   `--list-devices` reported `Vulkan0` as the RTX 3060 one hour and as the Radeon
   the next, same build, same hardware. `start-vlm.ps1` resolves the id by
@@ -283,7 +385,7 @@ Not free, and the trade is real:
 
 In rough order of value:
 
-1. **More photographs.** Both folders show one reading each, which cannot catch
+1. **More photographs.** Each folder shows one reading, which cannot catch
    a digit-specific bias — `8` vs `0` was found only because it happened to be
    in the data. A folder per reading, named `sys-dia-pul`, is picked up by
    `tools/vlm-grade.py` and the test suite automatically.

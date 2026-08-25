@@ -66,7 +66,21 @@ npm run ocr:server:stop
 ```
 
 `npm run ocr:server` prints status; `ocr:server:restart` does both. Or call it
-directly, which is the same thing and takes `-ShowToken`:
+directly, which is the same thing and takes the flags below:
+
+```bash
+powershell -ExecutionPolicy Bypass -File server/ocr.ps1 restart -Gpu nvidia
+```
+
+```bash
+powershell -ExecutionPolicy Bypass -File server/ocr.ps1 reload
+```
+
+`-Gpu` takes `igpu`, `nvidia` or an exact device id. `reload` restarts only the
+Python wrapper and leaves the model loaded, which is the difference between a
+two-second and a forty-second loop when the thing being changed is the prompt.
+
+`-ShowToken` prints the full token instead of the first characters.
 
 ```bash
 powershell -ExecutionPolicy Bypass -File server/ocr.ps1 status -ShowToken
@@ -76,15 +90,27 @@ powershell -ExecutionPolicy Bypass -File server/ocr.ps1 status -ShowToken
 the first characters of the token:
 
 ```
-  model    running  pid 52672  on Vulkan0
-  reader   running  pid 60256  on :6000
+  model    running  pid 48056  on Vulkan0 (NVIDIA GeForce RTX 3060)
+  reader   running  pid 55120  on :6000
   health   answering
-  vram     42.3 GB dedicated in use on the busiest adapter
-  ram      662 MB working set
+  vram     7.09 GB held by the model
+  ram      535 MB working set
   token    JhDiwU...  (-ShowToken for the full value)
 
   In the app, Settings -> Assisted reading:  192.168.1.100:6000
 ```
+
+Two lines there are less obvious than they look:
+
+**The card is named from the launch log, not by asking again.** Device numbering
+is not stable between enumerations — this model started on `Vulkan0 (NVIDIA
+GeForce RTX 3060)` and a `--list-devices` minutes later called `Vulkan0` the
+Radeon. `start-vlm.ps1` records what it chose at the moment it chose it, and
+that is what gets read back.
+
+**The VRAM figure is the model's own, not the adapter's.** It used to report the
+busiest adapter, which on a machine with two is close to meaningless: with the
+iGPU carve in use by something else it read 37 GB while the model held 7.
 
 **`stop` matches on the model filename, not the process name.** There is more
 than one llama-server on this machine, and a `Stop-Process -Name llama-server`
@@ -276,14 +302,29 @@ Worth being plain about:
 Selected by name, not by index:
 
 ```bash
-HH_VLM_GPU=igpu    powershell -ExecutionPolicy Bypass -File server/start-vlm.ps1
+powershell -ExecutionPolicy Bypass -File server/ocr.ps1 restart -Gpu nvidia
 ```
 
 ```bash
-HH_VLM_GPU=nvidia  powershell -ExecutionPolicy Bypass -File server/start-vlm.ps1
+powershell -ExecutionPolicy Bypass -File server/ocr.ps1 restart -Gpu igpu
 ```
 
-`igpu` is the default. An exact id (`Vulkan1`) also works if you know it.
+`igpu` is the default. An exact id (`Vulkan1`) also works if you know it. The
+underlying setting is the `HH_VLM_GPU` environment variable, which
+`start-vlm.ps1` reads — but prefer the flag.
+
+**Do not set it inline from a PowerShell prompt.** This looks right and is not:
+
+```
+powershell -Command "$env:HH_VLM_GPU='nvidia'; ./server/ocr.ps1 restart"
+```
+
+The outer shell expands `$env:HH_VLM_GPU` before the inner one ever sees it, so
+the inner shell is handed `='nvidia'` — a syntax error. The `restart` then runs
+anyway, on the default card, and the output looks like success. If you are
+already in PowerShell and want the variable rather than the flag, drop the
+wrapper: `$env:HH_VLM_GPU='nvidia'; ./server/ocr.ps1 restart` — and remember it
+sticks for that window.
 
 **Do not hardcode a device index.** llama.cpp's numbering is not stable — on this
 machine `--list-devices` reported `Vulkan0` as the RTX 3060 one hour and as the
@@ -423,17 +464,40 @@ The script exits non-zero only on the second.
 Current, on an RTX 3060:
 
 ```
-photos graded          27
-produced a reading     23  (85%)
-fully correct          24  (89%)
+photos graded          37
+produced a reading     33  (89%)
+fully correct          34  (92%)
 blood pressure WRONG   0      <- must stay 0
 pulse wrong            0
-mean time              11155 ms
+irregular found        9 of 9
+irregular FALSE ALARM  0      <- must stay 0
+mean time              14796 ms
 ```
 
-Each photo is read four ways and the answers must agree, so about eleven seconds
-covers four inferences. `--passes 1` skips the agreement check, which is useful
-for measuring the model alone and is not safe to run against.
+Each photo is read four ways and the answers must agree, plus a fifth zoomed
+look that may only vote on the irregular-heartbeat symbol — so about fifteen
+seconds covers five inferences. `--passes 1` skips both the agreement check and
+the zoomed pass, which is useful for measuring the model alone and is not safe
+to run against.
+
+**The irregular row has its own asymmetry**, and it is the opposite of the one
+above. A missed symbol loses information the user would have had to notice
+themselves; a false alarm puts a cardiac finding in a history that no
+measurement supports. Only the second has to stay at zero, and the script exits
+non-zero if it moves.
+
+### Adding fixtures
+
+Drop photographs into `tools/fixtures/<sys>-<dia>-<pul>/` and they are graded
+automatically — by this script and by the test suite. Anything the folder name
+cannot say goes in a `folder.json` beside them:
+
+```json
+{ "irregular": true }
+```
+
+That is currently the only key. Absent means an ordinary measurement with no
+symbol lit, which is what the other folders are.
 
 ---
 
@@ -447,12 +511,13 @@ for measuring the model alone and is not safe to run against.
 ```json
 {
   "ok": true,
-  "systolic": 106,
-  "diastolic": 88,
-  "pulse": 104,
+  "systolic": 167,
+  "diastolic": 105,
+  "pulse": 50,
+  "irregularHeartbeat": true,
   "reason": null,
   "warnings": [],
-  "elapsedMs": 1840,
+  "elapsedMs": 14780,
   "source": "vlm"
 }
 ```
@@ -461,3 +526,10 @@ for measuring the model alone and is not safe to run against.
 panel, or the power-on self test with every segment lit. `systolic` and
 `diastolic` are either both present or both absent; `pulse` can be null on its
 own, since a missing pulse is worth strictly less than a wrong one.
+
+`irregularHeartbeat` is `true` or `false` next to a reading and **`null` on a
+refusal** — "we could not read the display" and "the symbol was not showing" are
+different answers, and only the second belongs in a medical history.
+
+The response also carries a `renderings` array with what each pass saw, which is
+what to look at when a photo is refused and it is not obvious why.
