@@ -8,8 +8,8 @@ import * as LegacyFileSystem from 'expo-file-system/legacy';
 
 import { importProfiles, importReadings, listAllReadings, listProfiles } from '@/db/repository';
 import { wipeAllData } from '@/db/database';
-import { classify } from '@/domain/classification';
-import type { ClassificationScale, Profile, Reading } from '@/domain/types';
+import { classify, DEFAULT_THRESHOLDS, type ThresholdSet } from '@/domain/classification';
+import type { Profile, Reading } from '@/domain/types';
 import type { Dictionary } from '@/i18n';
 import { toISODate, toISODateTime } from '@/lib/format';
 
@@ -85,7 +85,7 @@ function csvCell(value: string | number | null | undefined): string {
 
 export async function exportCsv(
   t: Dictionary,
-  scale: ClassificationScale = 'esh',
+  thresholds: ThresholdSet = DEFAULT_THRESHOLDS,
 ): Promise<number> {
   const [profiles, readings] = await Promise.all([listProfiles(), listAllReadings()]);
   const names = new Map(profiles.map((p) => [p.id, p.name]));
@@ -116,7 +116,7 @@ export async function exportCsv(
       r.systolic,
       r.diastolic,
       r.pulse ?? '',
-      t.categories[classify(r.systolic, r.diastolic, scale).key].label,
+      t.categories[classify(r.systolic, r.diastolic, thresholds).key].label,
       r.arm ?? '',
       r.posture ?? '',
       r.irregularHeartbeat ? 'yes' : 'no',

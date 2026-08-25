@@ -2,8 +2,8 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { classify } from '@/domain/classification';
-import type { ClassificationScale, Reading } from '@/domain/types';
+import { classify, type ThresholdSet } from '@/domain/classification';
+import type { Reading } from '@/domain/types';
 import { useTranslation } from '@/i18n';
 import { formatTime } from '@/lib/format';
 
@@ -12,17 +12,17 @@ import { useTheme } from './ThemeProvider';
 export function CategoryPill({
   systolic,
   diastolic,
-  scale,
+  thresholds,
   compact,
 }: {
   systolic: number;
   diastolic: number;
-  scale: ClassificationScale;
+  thresholds: ThresholdSet;
   compact?: boolean;
 }) {
   const theme = useTheme();
   const t = useTranslation();
-  const category = classify(systolic, diastolic, scale);
+  const category = classify(systolic, diastolic, thresholds);
   const colours = theme.category[category.key];
   const names = t.categories[category.key];
 
@@ -135,16 +135,16 @@ export function ReadingValue({
 /** One row in the history list. */
 export function ReadingListItem({
   reading,
-  scale,
+  thresholds,
   onPress,
 }: {
   reading: Reading;
-  scale: ClassificationScale;
+  thresholds: ThresholdSet;
   onPress?: () => void;
 }) {
   const theme = useTheme();
   const t = useTranslation();
-  const category = classify(reading.systolic, reading.diastolic, scale);
+  const category = classify(reading.systolic, reading.diastolic, thresholds);
   const colours = theme.category[category.key];
   const names = t.categories[category.key];
 

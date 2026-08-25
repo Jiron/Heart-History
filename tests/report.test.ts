@@ -5,6 +5,7 @@ import type { Profile, Reading } from '../src/domain/types';
 import { de } from '../src/i18n/de';
 import { en } from '../src/i18n/en';
 import { buildReportHtml } from '../src/services/reportHtml';
+import { PRESETS } from '../src/domain/classification';
 
 /**
  * The doctor's report is the one screen that leaves the phone, and it is the
@@ -49,7 +50,7 @@ function reading(overrides: Partial<Reading> = {}): Reading {
 
 describe('doctor report', () => {
   it('translates the context column instead of printing storage keys', () => {
-    const html = buildReportHtml([reading()], profile, presetRange('all'), 'esh', de);
+    const html = buildReportHtml([reading()], profile, presetRange('all'), PRESETS.esh, de);
 
     expect(html).toContain('Linker Arm');
     expect(html).toContain('Sitzend');
@@ -62,7 +63,7 @@ describe('doctor report', () => {
   });
 
   it('translates the same reading into English', () => {
-    const html = buildReportHtml([reading()], profile, presetRange('all'), 'esh', en);
+    const html = buildReportHtml([reading()], profile, presetRange('all'), PRESETS.esh, en);
     expect(html).toContain('Left arm');
     expect(html).toContain('Before medication');
     expect(html).not.toContain('beforeMedication');
@@ -71,7 +72,7 @@ describe('doctor report', () => {
   it('forces a light page so a dark-mode device does not print dark on dark', () => {
     // expo-print renders through a WebView, which follows the system theme
     // unless the document says otherwise.
-    const html = buildReportHtml([reading()], profile, presetRange('all'), 'esh', de);
+    const html = buildReportHtml([reading()], profile, presetRange('all'), PRESETS.esh, de);
     expect(html).toContain('color-scheme: light');
     expect(html).toMatch(/html, body \{ background: #ffffff/);
   });
@@ -81,7 +82,7 @@ describe('doctor report', () => {
       [reading({ note: '<script>alert(1)</script>' })],
       { ...profile, name: 'A & B <b>' },
       presetRange('all'),
-      'esh',
+      PRESETS.esh,
       de,
     );
     expect(html).not.toContain('<script>alert(1)</script>');
@@ -94,7 +95,7 @@ describe('doctor report', () => {
       [reading({ pulse: null, arm: null, posture: null, tags: [], note: null })],
       profile,
       presetRange('all'),
-      'esh',
+      PRESETS.esh,
       de,
     );
     expect(html).toContain('128');

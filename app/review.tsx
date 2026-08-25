@@ -25,7 +25,7 @@ export default function ReviewScreen() {
   const theme = useTheme();
   const t = useTranslation();
   const insets = useSafeAreaInsets();
-  const { addReading, settings, profile } = useAppState();
+  const { addReading, settings, thresholds, profile } = useAppState();
 
   // Watched rather than consumed: the reading is still running when this screen
   // mounts, and it keeps running if the screen is closed. See state/scanBuffer.
@@ -91,11 +91,18 @@ export default function ReviewScreen() {
   if (job?.status === 'running') {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background, padding: 16, gap: 16 }}>
+        {/*
+          Fitted, not filled. The point of showing the photo here is "this is the
+          shot being read" -- and a cover crop of a portrait photo cuts the top
+          off, which on a monitor photographed upright is the systolic row. The
+          dimensions are not known until the read returns, so the box is fixed
+          and the photo is letterboxed inside it.
+        */}
         <Card padded={false} style={{ overflow: 'hidden' }}>
           <Image
             source={{ uri: job.sourceUri }}
-            style={{ width: '100%', height: 260 }}
-            resizeMode="cover"
+            style={{ width: '100%', height: 300, backgroundColor: theme.colors.background }}
+            resizeMode="contain"
             accessibilityLabel={t.review.photoAlt}
           />
         </Card>
@@ -296,7 +303,7 @@ export default function ReviewScreen() {
       <ReadingForm
         draft={draft}
         onChange={setDraft}
-        scale={settings.classificationScale}
+        thresholds={thresholds}
       />
 
       {problem ? <Banner tone="danger" message={problem} /> : null}

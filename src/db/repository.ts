@@ -5,6 +5,7 @@ import type {
   Reading,
   Settings,
 } from '@/domain/types';
+import { parseThresholds } from '@/domain/classification';
 import { newId } from '@/lib/id';
 
 import { getDatabase } from './database';
@@ -342,6 +343,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'activeProfileId'> = {
   theme: 'system',
   language: 'de',
   classificationScale: 'esh',
+  customThresholds: null,
   keepPhotos: true,
   alwaysConfirmScans: false,
   // Off unless the user sets it: the app reads on the device by default, and
@@ -362,6 +364,10 @@ export async function loadSettings(defaultProfileName = 'Me'): Promise<Settings>
     classificationScale:
       (map.get('classificationScale') as ClassificationScale) ??
       DEFAULT_SETTINGS.classificationScale,
+    // Stored as JSON in a text column, so it is parsed rather than cast --
+    // anything unusable comes back null and the app classifies against the
+    // standard scale instead. See parseThresholds.
+    customThresholds: parseThresholds(map.get('customThresholds') ?? null),
     keepPhotos: map.get('keepPhotos') !== 'false',
     alwaysConfirmScans: map.get('alwaysConfirmScans') === 'true',
     ocrServerUrl: map.get('ocrServerUrl') || null,

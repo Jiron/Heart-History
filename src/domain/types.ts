@@ -1,3 +1,5 @@
+import type { ThresholdSet } from './classification';
+
 /** Where a reading came from. Drives what the UI offers to re-check. */
 export type ReadingSource = 'scan' | 'manual' | 'import';
 
@@ -63,8 +65,16 @@ export interface Settings {
    * Which threshold set to classify against.
    * `esh` matches the scale the Microlife monitor's own traffic-light bar uses.
    * `home` uses the lower thresholds recommended for self-measurement.
+   * `custom` uses `customThresholds`.
    */
   classificationScale: ClassificationScale;
+  /**
+   * Hand-edited category boundaries, used only when the scale is `custom`.
+   *
+   * Null until someone edits them. Kept even while a preset is selected, so
+   * switching away and back does not lose the work.
+   */
+  customThresholds: ThresholdSet | null;
   /** Keep the source photo alongside each scanned reading. */
   keepPhotos: boolean;
   /** Ask for confirmation before saving a scan, even at high confidence. */
@@ -88,4 +98,4 @@ export interface Settings {
   ocrServerToken: string | null;
 }
 
-export type ClassificationScale = 'esh' | 'home';
+export type ClassificationScale = 'esh' | 'home' | 'custom';

@@ -9,6 +9,7 @@ import React, {
 
 import * as repo from '@/db/repository';
 import { dictionaryFor, resolveLanguage } from '@/i18n';
+import { thresholdsFor, type ThresholdSet } from '@/domain/classification';
 import type { NewReading, Profile, Reading, Settings } from '@/domain/types';
 import { deletePhoto } from '@/services/scan';
 
@@ -20,6 +21,14 @@ interface AppStateValue {
   profiles: Profile[];
   /** Every reading for the active profile, newest first. */
   readings: Reading[];
+  /**
+   * The category boundaries in force, already resolved from the chosen scale.
+   *
+   * Screens take this rather than the scale's name so that "which numbers does
+   * `custom` mean" is answered once, here, instead of at every call site --
+   * and so a scale that is missing or unusable falls back in one place.
+   */
+  thresholds: ThresholdSet;
   refresh: () => Promise<void>;
   addReading: (input: NewReading) => Promise<Reading>;
   editReading: (reading: Reading) => Promise<void>;
@@ -190,7 +199,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const updateSettings = useCallback(
     async (patch: Partial<Settings>) => {
       for (const [key, value] of Object.entries(patch)) {
-        await repo.setSetting(key, String(value));
+        // Objects are stored as JSON. `String(value)` on one writes
+        // "[object Object]", which parses back as nothing -- the setting would
+        // appear to save and be gone on the next launch.
+        const stored =
+          value !== null && typeof value === 'object' ? JSON.stringify(value) : String(value);
+        await repo.setSetting(key, stored);
       }
       setSettings((prev) => (prev ? { ...prev, ...patch } : prev));
       if (patch.activeProfileId) {
@@ -233,6 +247,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [profiles, settings?.activeProfileId, selectProfile],
   );
 
+  const thresholds = useMemo(
+    () =>
+      thresholdsFor(
+        settings?.classificationScale ?? 'esh',
+        settings?.customThresholds ?? null,
+      ),
+    [settings?.classificationScale, settings?.customThresholds],
+  );
+
   const value = useMemo<AppStateValue | null>(() => {
     if (!settings || !profile) return null;
     return {
@@ -242,6 +265,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       profile,
       profiles,
       readings,
+      thresholds,
       refresh,
       addReading,
       editReading,
@@ -259,6 +283,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     profile,
     profiles,
     readings,
+    thresholds,
     refresh,
     addReading,
     editReading,

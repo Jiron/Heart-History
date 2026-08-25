@@ -110,6 +110,33 @@ export const en: Dictionary = {
     all: 'All',
   },
 
+  bpRanges: {
+    title: 'Blood pressure ranges',
+    open: 'Ranges and thresholds',
+    openHint: 'Look up what “optimal” or “grade 1” means — and move the lines if you need to.',
+    whichScale: 'Which scale',
+    tableTitle: 'The ranges',
+    category: 'Category',
+    worseWins:
+      'Systolic and diastolic are graded separately and the worse of the two decides the category. That is why 125/95 is grade 1 rather than normal.',
+    under: (value: number) => `under ${value}`,
+    orMore: (value: number) => `${value} or more`,
+    boundaries: 'Adjust the thresholds',
+    boundariesHint:
+      'Each row is the point where the next category begins — systolic / diastolic.',
+    lowBelow: 'Low below',
+    startsAt: (category: string) => `${category} starts at`,
+    save: 'Save thresholds',
+    savedMessage: 'Saved. Every reading has been reclassified.',
+    resetStandard: 'Back to ESH',
+    resetHome: 'Back to home',
+    mustRise: (category: string, column: 'systolic' | 'diastolic') =>
+      `The ${column} value for “${category}” has to sit above the category below it. The thresholds must rise from top to bottom.`,
+    whatItMeans: 'What the categories mean',
+    disclaimer:
+      'These ranges describe a single measurement. They are not a diagnosis — individual readings vary widely, and only a clinician reading a series can say anything about your health.',
+  },
+
   trends: {
     bloodPressure: 'Blood pressure',
     notEnoughTitle: 'Not enough to chart yet',
@@ -166,6 +193,9 @@ export const en: Dictionary = {
       'Uses the standard ESH/ESC thresholds — the same scale your monitor\'s own traffic-light indicator is based on, so the app and the device agree.',
     scaleHomeHint:
       'Uses the lower thresholds recommended for self-measurement (hypertension from 135/85). Readings taken at home tend to run a few mmHg below clinic readings.',
+    scaleCustom: 'Custom',
+    scaleCustomHint:
+      'Uses thresholds you set yourself. Useful if a clinician has given you different targets. Edit them under “Ranges and thresholds”.',
     scanning: 'Scanning',
     keepPhotos: 'Keep the photos',
     keepPhotosHint:

@@ -115,6 +115,36 @@ export const de = {
     all: 'Alle',
   },
 
+  bpRanges: {
+    title: 'Blutdruck-Bereiche',
+    open: 'Bereiche und Grenzwerte',
+    openHint: 'Nachschauen, was «optimal» oder «Grad 1» bedeutet — und die Grenzen bei Bedarf anpassen.',
+    whichScale: 'Welche Skala',
+    tableTitle: 'Die Bereiche',
+    category: 'Kategorie',
+    worseWins:
+      'Oberer und unterer Wert werden getrennt beurteilt; der schlechtere der beiden bestimmt die Kategorie. 125/95 ist deshalb Grad 1, nicht «normal».',
+    under: (value: number) => `unter ${value}`,
+    orMore: (value: number) => `${value} oder mehr`,
+    boundaries: 'Grenzwerte anpassen',
+    boundariesHint:
+      'Jede Zeile ist der Punkt, an dem die nächste Kategorie beginnt — oberer / unterer Wert.',
+    lowBelow: 'Tief unterhalb von',
+    startsAt: (category: string) => `${category} ab`,
+    save: 'Grenzwerte speichern',
+    savedMessage: 'Gespeichert. Alle Messungen wurden neu eingeordnet.',
+    resetStandard: 'Zurück auf ESH',
+    resetHome: 'Zurück auf Heim',
+    // Takes the column as a key, not as a ready-made word: German needs
+    // "Der obere Wert" here and "beim oberen Wert" elsewhere, and a dictionary
+    // that hands out one noun for every sentence gets one of them wrong.
+    mustRise: (category: string, column: 'systolic' | 'diastolic') =>
+      `Der ${column === 'systolic' ? 'obere' : 'untere'} Wert für «${category}» muss über dem der Kategorie darunter liegen. Die Grenzwerte müssen von oben nach unten ansteigen.`,
+    whatItMeans: 'Was die Kategorien bedeuten',
+    disclaimer:
+      'Diese Bereiche beschreiben eine einzelne Messung. Sie sind keine Diagnose — einzelne Werte schwanken stark, und nur eine Ärztin oder ein Arzt kann aus einer Reihe von Messungen etwas ableiten.',
+  },
+
   trends: {
     bloodPressure: 'Blutdruck',
     notEnoughTitle: 'Noch zu wenig für ein Diagramm',
@@ -175,6 +205,9 @@ export const de = {
       'Verwendet die ESH/ESC-Grenzwerte — dieselbe Skala, auf der die Ampelanzeige deines Messgeräts beruht. So sind App und Gerät sich einig.',
     scaleHomeHint:
       'Verwendet die tieferen Grenzwerte für die Selbstmessung (Bluthochdruck ab 135/85). Zu Hause gemessene Werte liegen meist etwas unter denen in der Praxis.',
+    scaleCustom: 'Eigene',
+    scaleCustomHint:
+      'Verwendet deine eigenen Grenzwerte. Sinnvoll, wenn dir jemand aus der Praxis andere Zielwerte genannt hat. Anpassen unter «Bereiche und Grenzwerte».',
     scanning: 'Scannen',
     keepPhotos: 'Fotos behalten',
     keepPhotosHint:

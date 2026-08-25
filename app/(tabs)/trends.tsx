@@ -31,8 +31,7 @@ export default function TrendsScreen() {
   const theme = useTheme();
   const t = useTranslation();
   const insets = useSafeAreaInsets();
-  const { readings, settings, profile } = useAppState();
-  const scale = settings.classificationScale;
+  const { readings, thresholds, profile } = useAppState();
 
   const [rangeKey, setRangeKey] = useState<RangeKey>('90d');
   const [custom, setCustom] = useState(() => ({
@@ -55,7 +54,7 @@ export default function TrendsScreen() {
     [readings, range],
   );
 
-  const summary = useMemo(() => summarise(filtered, scale), [filtered, scale]);
+  const summary = useMemo(() => summarise(filtered, thresholds), [filtered, thresholds]);
   const trend = useMemo(() => trendOf(filtered), [filtered]);
   const dayParts = useMemo(() => averagesByDayPart(filtered), [filtered]);
 
@@ -261,7 +260,7 @@ export default function TrendsScreen() {
                   <CategoryPill
                     systolic={Math.round(summary.systolic.mean)}
                     diastolic={Math.round(summary.diastolic.mean)}
-                    scale={scale}
+                    thresholds={thresholds}
                   />
                 </View>
               ) : null}

@@ -8,7 +8,7 @@
  * front of the user lives next door.
  */
 
-import { classify } from '@/domain/classification';
+import { classify, type ThresholdSet } from '@/domain/classification';
 import {
   averagesByDayPart,
   bucketise,
@@ -18,7 +18,7 @@ import {
   trendOf,
   type DateRange,
 } from '@/domain/statistics';
-import type { ClassificationScale, Profile, Reading } from '@/domain/types';
+import type { Profile, Reading } from '@/domain/types';
 import type { Dictionary } from '@/i18n/de';
 import { formatDate, formatTime } from '@/lib/format';
 
@@ -78,11 +78,11 @@ export function buildReportHtml(
   readings: Reading[],
   profile: Profile,
   range: DateRange,
-  scale: ClassificationScale,
+  thresholds: ThresholdSet,
   t: Dictionary,
 ): string {
   const sorted = [...readings].sort((a, b) => a.measuredAt - b.measuredAt);
-  const summary = summarise(sorted, scale);
+  const summary = summarise(sorted, thresholds);
   const trend = trendOf(sorted);
   const week = sevenDayAverage(sorted);
   const parts = averagesByDayPart(sorted);
@@ -100,7 +100,7 @@ export function buildReportHtml(
   const rows = [...sorted]
     .reverse()
     .map((r) => {
-      const category = classify(r.systolic, r.diastolic, scale);
+      const category = classify(r.systolic, r.diastolic, thresholds);
       return `
         <tr>
           <td>${esc(formatDate(r.measuredAt))}</td>
