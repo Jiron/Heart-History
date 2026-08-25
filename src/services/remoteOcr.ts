@@ -270,9 +270,16 @@ function warningsFrom(reading: RemoteReading): OcrWarning[] {
   for (const code of reading.warnings) {
     if (code === 'allSegmentsLit') out.push({ code: 'selfTest' });
     else if (code === 'implausiblePair') out.push({ code: 'systolicNotAbove' });
+    // The commonest refusal from the assisted reader, and it used to be
+    // dropped here -- which left the fallback below claiming no digit was
+    // legible on photos where two of the three had been read cleanly.
+    else if (code === 'readingsDisagreed') out.push({ code: 'readingsDisagreed' });
   }
   if (!reading.ok && reading.reason === 'illegible' && out.length === 0) {
-    out.push({ code: 'noDigitsRead' });
+    // Only when *nothing* came back. A refusal that still produced a number is
+    // a different situation and gets a message that says so.
+    const readNothing = reading.systolic === null && reading.diastolic === null;
+    out.push({ code: readNothing ? 'noDigitsRead' : 'partialRead' });
   }
   if (reading.ok && reading.pulse === null) out.push({ code: 'pulseUnreadable' });
   return out;
