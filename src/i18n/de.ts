@@ -516,6 +516,8 @@ export const de = {
     notes: 'Notizen',
     trendNote: (sys: string, dia: string, fit: number) =>
       `In diesem Zeitraum hat sich der systolische Wert um ${sys} mmHg pro Woche verändert und der diastolische um ${dia} mmHg pro Woche (Anpassungsgüte r² = ${fit}). Einzelmessungen streuen stark; bei kleinem r² ist die Trendlinie keine Vorhersage.`,
+    scaleUsed: (list: string) =>
+      `Einstufung nach diesen Grenzwerten (oberer/unterer Wert): ${list}. Darüber gilt jeweils die nächsthöhere Kategorie.`,
     footerNote:
       'Die Messungen wurden zu Hause mit einem persönlichen Messgerät durchgeführt und in Heart History erfasst. Zu Hause gemessene Werte liegen meist etwas unter denen in der Praxis. Dieser Bericht ist eine Aufzeichnung von Messwerten, keine Diagnose.',
     generated: (date: string) => `Erstellt am ${date} · Heart History`,

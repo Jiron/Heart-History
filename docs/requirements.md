@@ -107,6 +107,33 @@ happened to be showing is stored alongside as `deviceDisplayHint` and offered in
 the review screen as a one-tap "use this date" suggestion — a hint, never a
 source of truth.
 
+## Categories, and letting the thresholds move
+
+Every reading carries a category, and it is the only interpretation this app
+offers. Three things follow from that, and all three are load-bearing:
+
+**It says where the lines are.** Settings › Classification › "Ranges and
+thresholds" lists all seven categories with their systolic and diastolic spans
+and a sentence on what each describes. A colour with no stated meaning is not
+information.
+
+**The lines can be moved, and a broken set is refused.** Guidance is not the
+only defensible scale — a clinician may give someone different targets, and
+before this there were two fixed choices. A custom scale whose boundaries do not
+rise is rejected by the editor, by name, because such a set has a category no
+reading can ever land in: that fails as a colour which never appears rather than
+as an error. A stored value that would do the same — an older build's, a hand
+edit, a corrupted row — is turned away on read and the standard scale is used
+instead. A reading with no category is worse than one graded against numbers the
+user did not pick.
+
+**A report that leaves the phone says which thresholds it used.** Once the
+scale is editable, "grade 1" on a PDF handed to a doctor no longer means one
+thing. The report prints the boundaries under the readings table.
+
+None of this is a diagnosis, and the screen says so. A category describes one
+measurement; single readings vary widely.
+
 ## Refusing rather than guessing
 
 A blood-pressure log that silently records a wrong number is worse than one that

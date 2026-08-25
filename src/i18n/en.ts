@@ -499,6 +499,8 @@ export const en: Dictionary = {
     notes: 'Notes',
     trendNote: (sys: string, dia: string, fit: number) =>
       `Over this period systolic moved about ${sys} mmHg per week and diastolic ${dia} mmHg per week (line fit r² = ${fit}). Individual readings vary widely; a low fit means the trend line should not be read as a prediction.`,
+    scaleUsed: (list: string) =>
+      `Categories use these thresholds (systolic/diastolic): ${list}. Anything above falls into the next category up.`,
     footerNote:
       'Readings were taken at home with a personal monitor and recorded in Heart History. Home measurements typically run a little lower than those taken in a clinic. This report is a record of measurements, not a diagnosis.',
     generated: (date: string) => `Generated ${date} · Heart History`,

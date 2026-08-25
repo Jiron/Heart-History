@@ -8,7 +8,7 @@
  * front of the user lives next door.
  */
 
-import { classify, type ThresholdSet } from '@/domain/classification';
+import { BOUNDED, classify, type ThresholdSet } from '@/domain/classification';
 import {
   averagesByDayPart,
   bucketise,
@@ -83,6 +83,13 @@ export function buildReportHtml(
 ): string {
   const sorted = [...readings].sort((a, b) => a.measuredAt - b.measuredAt);
   const summary = summarise(sorted, thresholds);
+
+  const scaleNote = [
+    `${t.categories.low.short} < ${thresholds.low.systolic}/${thresholds.low.diastolic}`,
+    ...BOUNDED.map(
+      (key) => `${t.categories[key].short} < ${thresholds[key].systolic}/${thresholds[key].diastolic}`,
+    ),
+  ].join('  ·  ');
   const trend = trendOf(sorted);
   const week = sevenDayAverage(sorted);
   const parts = averagesByDayPart(sorted);
@@ -262,6 +269,15 @@ export function buildReportHtml(
     <tbody>${rows}</tbody>
   </table>
 
+  <!--
+    Which thresholds produced the categories above.
+    
+    Since they became editable this is no longer implied. A report that says
+    "grade 1" without saying where grade 1 starts is misleading to the one
+    reader who matters here, and the numbers are the part a clinician can check
+    against their own scale in a second.
+  -->
+  <div class="note">${esc(t.report.scaleUsed(scaleNote))}</div>
   <div class="note">${esc(t.report.footerNote)}</div>
   <div class="foot">${esc(t.report.generated(formatDate(Date.now())))}</div>
 </body>

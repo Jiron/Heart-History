@@ -15,13 +15,15 @@ take two or three readings a minute apart and average them. A mode that walks
 through that — rest timer, then prompts for each reading, then saves the average
 as one entry — would make the numbers meaningfully more reliable.
 
-**More real photographs.** Four are in `tools/fixtures/` and every structural
-fix in the recogniser came from them — but four is not a sample, and all four are
-of the same unit in the same room. The next ten should be deliberately varied:
-different light, different angles, values with a leading `1`, an `Err` screen, a
-low battery. Drop them in with expected values in `expected.json` and both
-`npm run ocr:real` and the test suite pick them up automatically. This is the
-single highest-value item for recognition quality.
+**More real photographs, of more readings.** There are 37 now, across four
+readings, and every structural fix came from them. What the set still cannot
+catch is a digit-specific bias: `8` misread as `0` was found only because a `88`
+happened to be in the data. Each new *reading* is worth more than ten more
+photographs of one already covered — particularly an `Err` screen, a low
+battery, and values whose digits are not already represented. Drop a folder
+named `sys-dia-pul` into `tools/fixtures/` and `tools/vlm-grade.py`,
+`npm run ocr:real` and the test suite all pick it up; a `folder.json` beside the
+photos carries anything the name cannot say.
 
 **Raise the accept rate on hard photos.** The recogniser never accepts a wrong
 blood pressure, but on the three real fixtures it only reads the display about a
@@ -31,11 +33,17 @@ addressable one at a time — the most common is only two of the three value row
 being located, which the three-row safety rule then correctly refuses to guess
 from.
 
-**Detect the display icons.** The monitor's irregular-heartbeat symbol,
-cuff-fit-check tick and traffic-light position are read today only as user
-toggles. They sit at known positions relative to the value block, so detecting
-them is tractable — but it wants more real photos to calibrate against, so it
-follows the item above.
+**Detect the remaining display icons.** The irregular-heartbeat symbol is read
+by the assisted reader now — see
+[assisted-reading.md](assisted-reading.md#the-irregular-heartbeat-symbol) for
+the measurements and why its aggregation rule is the opposite of the one the
+numbers use. The cuff-fit tick, the stored-average `A` and the traffic-light
+position are still user toggles only. Adding each is a schema field and a
+paragraph of prompt, and the same grading harness measures it — but each one
+also needs fixtures where it is lit *and* fixtures where it is not, because the
+false-alarm rate is the number that decides whether it can be trusted. On the
+device reader they remain undetected; they sit at known positions relative to
+the value block, so it is tractable there too, and follows panel detection.
 
 **Batch scanning of stored readings.** The monitor keeps its last 30
 measurements. Stepping through them with `M` and scanning each is tedious; a mode

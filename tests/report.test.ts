@@ -77,6 +77,16 @@ describe('doctor report', () => {
     expect(html).toMatch(/html, body \{ background: #ffffff/);
   });
 
+  it('says which thresholds produced the categories', () => {
+    // Editable thresholds make this necessary rather than decorative: a report
+    // that says "grade 1" without saying where grade 1 begins tells the one
+    // reader who matters something that may not be true on their scale.
+    const custom = { ...PRESETS.esh, grade1: { systolic: 145, diastolic: 92 } };
+    const html = buildReportHtml([reading()], profile, presetRange('all'), custom, en);
+    expect(html).toContain('Grade 1 &lt; 145/92');
+    expect(html).not.toContain('Grade 1 &lt; 160/100');
+  });
+
   it('escapes anything the user typed', () => {
     const html = buildReportHtml(
       [reading({ note: '<script>alert(1)</script>' })],

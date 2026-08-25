@@ -14,7 +14,8 @@ npm run android      # Expo Go on a connected device or emulator
 ## What it does
 
 - **Scan a reading.** Photograph the display; systolic, diastolic and pulse are
-  read on the phone and pre-filled for you to confirm.
+  read and pre-filled for you to confirm — along with the monitor's
+  irregular-heartbeat symbol, if it was lit.
 - **Or type it in.** Full manual entry, no photo needed. Every reading can be
   edited or deleted afterwards.
 - **See the history.** Grouped by day, filtered by last week / month / 3 months /
@@ -24,6 +25,9 @@ npm run android      # Expo Go on a connected device or emulator
   that home-monitoring guidance asks for.
 - **Keep it safe.** JSON backup, CSV export, and a printable PDF report for a
   doctor's appointment. Restore by merging or replacing.
+- **Know what the colours mean.** Every category, its systolic and diastolic
+  range and what it describes, on one screen — with the thresholds editable if a
+  clinician has given you different targets.
 - **Share the monitor.** Separate profiles, each with its own history and targets.
 - **Read it in your language.** German and English, German by default, switchable
   in Settings. Dates and number formats follow the choice.

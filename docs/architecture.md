@@ -169,3 +169,10 @@ Hermes. No polyfill required.
 
 **Refuse rather than guess.** The recogniser only reports success when it can
 justify it. See [ocr.md](ocr.md).
+
+**Thresholds travel as a value, never as a name.** `classify` takes a
+`ThresholdSet`, not `'esh' | 'home' | 'custom'`, and `useAppState()` resolves it
+once. Passing the name would mean every screen learning what `custom` resolves
+to — and an unusable custom scale degrading differently on each of them. The
+ranges screen derives its printed spans from the same object, so an edited scale
+describes itself instead of showing the numbers it used to have.
