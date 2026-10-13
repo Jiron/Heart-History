@@ -10,6 +10,7 @@ app/                      expo-router routes — screens only, no logic
   entry.tsx               manual entry, no photo
   reading/[id].tsx        view / edit / delete one reading
   profiles.tsx            manage the people sharing the monitor
+  ranges.tsx              what each category means, and the custom-scale editor
 
 src/
   ocr/                    the display recogniser — pure TS, zero RN imports
@@ -160,7 +161,8 @@ file — which is how two bugs in it were found.
 unmodified, which keeps the edit-run loop to a reload.
 
 **No network, enforced by the OS.** `INTERNET` is stripped from the manifest of
-every non-development build. See [requirements.md](requirements.md).
+every build except `development` and the opt-in `assisted-apk`. See
+[requirements.md](requirements.md) and [building.md](building.md#the-network-permission).
 
 **Pixel access in pure JavaScript.** `expo-image-manipulator` downscales the
 photo and returns base64; `jpeg-js` decodes it to RGBA with `useTArray`, which

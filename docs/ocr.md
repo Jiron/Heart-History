@@ -364,7 +364,9 @@ The four photographs above were taken to test the recogniser: the monitor fills
 the frame and the camera is roughly square-on. Twenty-three later ones were not.
 They are in `tools/fixtures/106-88-104/` and `tools/fixtures/107-78-98/`, taken
 the way a person actually takes them - monitor small in frame, held at an angle,
-lit by a phone torch, sometimes slightly soft. Run them with `npm run ocr:folders`.
+lit by a phone torch, sometimes slightly soft. Run them with `npm run ocr:folders`,
+which now also reads the ten in `tools/fixtures/167-105-50/`, added afterwards;
+the figures below are for the original twenty-three.
 
 ```
 runs 92   accepted 4   correct 4   WRONG 0
@@ -428,12 +430,14 @@ covers most home monitors, and nothing about the Microlife's specific layout is
 hard-coded — no pixel coordinates, no fixed panel position. Values are found by
 structure, so a different device with the same conventions should work as-is.
 
-The tunable parts, all in [`types.ts`](../src/ocr/types.ts) and
-[`sevenSegment.ts`](../src/ocr/sevenSegment.ts):
+The tunable parts, mostly in [`types.ts`](../src/ocr/types.ts),
+[`sevenSegment.ts`](../src/ocr/sevenSegment.ts) and
+[`layout.ts`](../src/ocr/layout.ts):
 
-- `SEGMENT_WINDOWS` — where each segment is probed within a cell
-- `GLYPH_ASPECT` — fallback cell width/height
-- `DEFAULT_OCR_OPTIONS` — threshold sensitivity and the on/off band
+- `SEGMENT_WINDOWS` in `sevenSegment.ts` — where each segment is probed within a
+  cell
+- `GLYPH_ASPECT` in `layout.ts` — fallback cell width/height
+- `DEFAULT_OCR_OPTIONS` in `types.ts` — threshold sensitivity and the on/off band
 - `PASS_VARIANTS` in `pipeline.ts` — the window sizes, sensitivities and
   denoise levels tried
 - `PULSE_HEIGHT_RANGE` and `PRESSURE_HEIGHT_RATIO` in `layout.ts` — the row

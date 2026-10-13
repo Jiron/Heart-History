@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Node 20+
+- Node 20.19.4+, 22.13+ or 24.3+ (React Native's own floor)
 - An Android device or emulator (or Expo Go on your phone)
 - An [expo.dev](https://expo.dev) account, only for cloud builds
 
@@ -39,9 +39,10 @@ npx expo run:android
 
 Two things in that snippet are not optional:
 
-**`EAS_BUILD_PROFILE`.** Released builds have `INTERNET` stripped from the
-manifest. Without this, a local development build cannot reach Metro and will
-sit on a blank screen. See [requirements.md](requirements.md).
+**`EAS_BUILD_PROFILE`.** `app.config.ts` strips `INTERNET` from the manifest
+unless the profile is `development` or `HH_ALLOW_NETWORK=1` is set. Without
+this, a local development build cannot reach Metro and will sit on a blank
+screen. See *The network permission* below.
 
 **`JAVA_HOME` pointing at a JDK 17.** Android Studio now ships JBR 25, and
 building against it fails in the CMake configure step for `react-native-worklets`
@@ -70,7 +71,8 @@ adb reverse tcp:8081 tcp:8081
 ## Testing
 
 ```bash
-npm test             # recogniser suite (renders and reads ~200 synthetic photos)
+npm test             # vitest: the recogniser (~200 synthetic photos and the real
+                     # fixtures), classification and the doctor's report
 npm run typecheck    # tsc --noEmit
 npm run lint
 ```
@@ -135,9 +137,20 @@ npx eas-cli init           # links this folder to a project on your account
 ```
 
 Without the first, every build stops at *"An Expo user account is required to
-proceed."* `init` writes an `extra.eas.projectId` into the config; `eas.json`
-sets `appVersionSource: "remote"`, so EAS keeps `versionCode` on the server and
-needs to know which project it belongs to.
+proceed."* `init` links the folder to a project, which EAS needs because
+`eas.json` sets `appVersionSource: "remote"` and keeps `versionCode` on the
+server. `app.config.ts` is a dynamic config, so `init` cannot edit it: it prints
+the `extra.eas.projectId` to add, and you paste it in.
+
+**If you have forked the repository**, `app.config.ts` still carries the
+original author's `extra.eas.projectId` and the `updates.url` derived from it.
+With an ID already present, `init` will not link a new project; it treats the
+folder as belonging to that one, which is not on your account, and fails, as
+does `eas build`. Delete both fields first, then run `init`; set `updates.url` to
+`https://u.expo.dev/<your project id>`, or leave it out if you do not use EAS
+Update. If you ship your own build, also change the package id
+`ch.opten.hearthistory` (`android.package`, and `ios.bundleIdentifier`) to one
+of your own: two apps with the same id cannot be installed side by side.
 
 ### The quick one
 
@@ -176,8 +189,10 @@ account, because the signing credentials live on it.
 ### Version numbers
 
 `eas.json` sets `appVersionSource: "remote"`, so EAS owns `versionCode` and
-increments it per production build. The user-facing `version` lives in
-`app.config.ts` and you bump it by hand per release.
+increments it on each `production` (AAB) build. `production-apk` and
+`assisted-apk` turn `autoIncrement` off and reuse the current value. The
+user-facing `version` lives in `app.config.ts` and you bump it by hand per
+release.
 
 ### The network permission
 
@@ -190,8 +205,10 @@ request.
 `assisted-apk` also turns on `usesCleartextTraffic`, via `expo-build-properties`.
 A server on your own network has no certificate a phone would trust, and Android
 blocks plain HTTP by default — without it every request fails with an error that
-does not say why. Both are driven by the same `HH_ALLOW_NETWORK` variable, set in
-`eas.json` for that one profile, so they cannot drift apart.
+does not say why. It also declares `ACCESS_LOCAL_NETWORK`, which Android 16
+requires before an app may reach an address on the LAN. All three are driven by
+the same `HH_ALLOW_NETWORK` variable, set in `eas.json` for that one profile, so
+they cannot drift apart. (`development` gets the same three.)
 
 You can confirm it on a built APK:
 

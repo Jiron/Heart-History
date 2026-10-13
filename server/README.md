@@ -1,8 +1,10 @@
 # Assisted reading
 
 An optional pair of local services that read a blood-pressure display far more
-reliably than the phone can on its own. Everything here runs on your machine;
-nothing is hosted, and no photo leaves your network.
+reliably than the phone can on its own. Everything here runs on a machine you
+control; this project hosts nothing, and the app ships with no server address
+configured. On your own network no photo leaves it. Through a tunnel (below) it
+passes through Cloudflare on the way.
 
 The app works without it. See "What this costs you" before turning it on.
 
@@ -36,20 +38,44 @@ and read them without preprocessing beyond a downscale.
 
 ## What you need
 
-* **llama.cpp** with a Vulkan or CUDA backend.
-  This repo was set up against the build in `D:\AiApiStuff\runtime\llamacpp`.
-* **A vision model.** Qwen3-VL-8B-Instruct, about 6.2 GB in total:
+* **llama.cpp** with a Vulkan or CUDA backend, recent enough to run Qwen3-VL
+  and to accept the flags `start-vlm.ps1` passes to `llama-server`.
+* **A vision model.** Qwen3-VL-8B-Instruct, about 6.2 GB in total. Put it
+  wherever suits you; `C:/models` here is only an example:
 
 ```bash
-curl -L -o D:/AiApiStuff/models/Qwen3VL-8B-Instruct-Q4_K_M.gguf "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/Qwen3VL-8B-Instruct-Q4_K_M.gguf"
+curl -L --create-dirs -o C:/models/Qwen3VL-8B-Instruct-Q4_K_M.gguf "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/Qwen3VL-8B-Instruct-Q4_K_M.gguf"
 ```
 
 ```bash
-curl -L -o D:/AiApiStuff/models/mmproj-Qwen3VL-8B-Instruct-F16.gguf "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/mmproj-Qwen3VL-8B-Instruct-F16.gguf"
+curl -L --create-dirs -o C:/models/mmproj-Qwen3VL-8B-Instruct-F16.gguf "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/mmproj-Qwen3VL-8B-Instruct-F16.gguf"
 ```
 
 * **Python 3.11+ with Pillow.** Nothing else — the wrapper is standard library
   apart from the image decode.
+
+Then tell `start-vlm.ps1` where those are, with three environment variables:
+
+| Variable | Points at |
+|---|---|
+| `HH_LLAMA_SERVER` | `llama-server.exe` |
+| `HH_VLM_MODEL` | `Qwen3VL-8B-Instruct-Q4_K_M.gguf` |
+| `HH_VLM_MMPROJ` | `mmproj-Qwen3VL-8B-Instruct-F16.gguf` |
+
+```powershell
+$env:HH_LLAMA_SERVER = 'C:\llama.cpp\llama-server.exe'
+$env:HH_VLM_MODEL    = 'C:\models\Qwen3VL-8B-Instruct-Q4_K_M.gguf'
+$env:HH_VLM_MMPROJ   = 'C:\models\mmproj-Qwen3VL-8B-Instruct-F16.gguf'
+```
+
+Set them in the shell you start the server from, or permanently in your user
+environment. Any that are unset fall back to the paths on the author's machine
+under `D:\AiApiStuff`, which will not exist on yours; the script names whichever
+file is missing and stops.
+
+The scripts are PowerShell and assume Windows. Elsewhere, start `llama-server`
+with the flags at the bottom of `start-vlm.ps1` and run `ocr_server.py`
+directly — see *Starting the halves separately*.
 
 ---
 
@@ -112,10 +138,12 @@ that is what gets read back.
 busiest adapter, which on a machine with two is close to meaningless: with the
 iGPU carve in use by something else it read 37 GB while the model held 7.
 
-**`stop` matches on the model filename, not the process name.** There is more
-than one llama-server on this machine, and a `Stop-Process -Name llama-server`
-would take out whichever unrelated one happened to be running. That is the sort
-of thing you notice an hour later.
+**`stop` matches on the model's alias, not the process name.** There is more
+than one llama-server on the author's machine, and a `Stop-Process -Name
+llama-server` would take out whichever unrelated one happened to be running.
+That is the sort of thing you notice an hour later. `ocr.ps1` looks for the
+`heart-history-vlm` alias that `start-vlm.ps1` passes on the command line, so it
+finds the model whatever its file is called.
 
 Logs go to `server/logs/` (gitignored). They contain no readings — see the note
 under *What this costs you*.
@@ -229,8 +257,9 @@ authenticate through it — the bearer token is what this server understands.
 ## Handling files from strangers
 
 The server takes uploads from whoever can reach the tunnel, so this is written
-down rather than assumed. `python server/attack_test.py` runs all of it against
-a live server and prints what happened.
+down rather than assumed. `python server/attack_test.py` (or
+`npm run ocr:server:attack`) sends the hostile uploads below to a live server
+and prints what happened.
 
 ### Nothing that arrives can run
 
@@ -264,7 +293,7 @@ are cheap; together they cut the decoder surface by roughly 90%.
 | | |
 |---|---|
 | `MAX_UPLOAD_BYTES` | 25 MB. Larger gets `413` and the socket closed **without reading the body** — reading 26 MB to politely refuse 26 MB is the thing being defended against. |
-| `Image.MAX_IMAGE_PIXELS` | 40 MP, raised as an error. Pillow's own limit is ~89 MP and only *warns* below it; a few dozen bytes of PNG can declare a 50000×50000 canvas. |
+| `Image.MAX_IMAGE_PIXELS` | 40 MP, down from Pillow's ~89 MP default. Pillow only *warns* above this value and raises above twice it, so anything over 80 MP is refused before decoding; between 40 and 80 MP it decodes with a warning. A few dozen bytes of PNG can declare a 50000×50000 canvas. |
 | `MAX_IN_FLIGHT` | 4. Each request in flight holds an upload, a decoded bitmap and four renderings, and `ThreadingHTTPServer` starts a thread per connection. The surplus gets an immediate `503`. |
 | `Handler.timeout` | 30 s on socket operations, so a connection that goes quiet mid-request does not hold a thread forever. |
 
@@ -309,9 +338,11 @@ powershell -ExecutionPolicy Bypass -File server/ocr.ps1 restart -Gpu nvidia
 powershell -ExecutionPolicy Bypass -File server/ocr.ps1 restart -Gpu igpu
 ```
 
-`igpu` is the default. An exact id (`Vulkan1`) also works if you know it. The
-underlying setting is the `HH_VLM_GPU` environment variable, which
-`start-vlm.ps1` reads — but prefer the flag.
+`igpu` is the default, and picks the first AMD or Intel adapter; `nvidia` picks
+the first NVIDIA one. On a machine without an AMD or Intel GPU the default finds
+nothing and stops, listing what it did find — pass `-Gpu nvidia` or an exact id
+(`Vulkan1`) instead. The underlying setting is the `HH_VLM_GPU` environment
+variable, which `start-vlm.ps1` reads — but prefer the flag.
 
 **Do not set it inline from a PowerShell prompt.** This looks right and is not:
 
@@ -326,13 +357,19 @@ already in PowerShell and want the variable rather than the flag, drop the
 wrapper: `$env:HH_VLM_GPU='nvidia'; ./server/ocr.ps1 restart` — and remember it
 sticks for that window.
 
-**Do not hardcode a device index.** llama.cpp's numbering is not stable — on this
-machine `--list-devices` reported `Vulkan0` as the RTX 3060 one hour and as the
-Radeon 8060S the next, with no change to the build or the hardware. That is why
+**Do not hardcode a device index.** llama.cpp's numbering is not stable — on the
+author's machine `--list-devices` reported `Vulkan0` as the RTX 3060 one hour
+and as the Radeon 8060S the next, with no change to the build or the hardware. That is why
 `start-vlm.ps1` resolves the id by matching the adapter name at every launch,
 and why it prints which one it picked.
 
-Measured over the full fixture set, four renderings per photo:
+The figures below and under *Memory* were measured on the author's machine,
+which has both a Radeon 8060S iGPU and an RTX 3060. They are a reference, not a
+requirement. The model held 5.5 to 7.4 GB of VRAM on these two, which is the
+figure to compare against your own card.
+
+Measured over the 27 photographs the fixture set held at the time (before
+`167-105-50` was added), four renderings per photo:
 
 | | Radeon 8060S (iGPU) | RTX 3060 |
 |---|---|---|
@@ -380,9 +417,11 @@ file resident in the page cache. Same runtime, same GPU, one flag apart.
 ### The iGPU does not eat system RAM here, and that is not automatic
 
 On a machine where the iGPU takes memory dynamically, "VRAM" really is system
-RAM. This one is configured differently: 128 GB unified with **64 GB carved off
-in the BIOS as dedicated VRAM**, leaving 64 GB as system memory. The carve is
-separate silicon budget, so a model in it costs the system nothing.
+RAM. The author's machine is configured differently: 128 GB unified with
+**64 GB carved off in the BIOS as dedicated VRAM**, leaving 64 GB as system
+memory. The carve is separate silicon budget, so a model in it costs the system
+nothing. Nothing here needs that setup; it is what these measurements were taken
+on.
 
 Measured, by stopping the server and diffing the counter:
 
@@ -417,9 +456,10 @@ Two traps in the numbers, both of which cost an hour if you trust them:
 
 ## What this costs you
 
-The app is built so that released binaries have no `INTERNET` permission at all
-— see the comment at the top of `app.config.ts`. That is not a promise in a
-privacy policy, it is a thing Android enforces.
+The app is built so that its default builds have no `INTERNET` permission at
+all — see the comment at the top of `app.config.ts`. That is not a promise in a
+privacy policy, it is a thing Android enforces. (Development builds keep it, to
+reach Metro.)
 
 Assisted reading needs that permission. So it is a **separate build**:
 
@@ -442,7 +482,9 @@ with no network access whatsoever. The trade, stated plainly:
   sent to the address you typed" is a property of this source code, not
   something the operating system is enforcing on your behalf.
 * **Also changed.** Cleartext HTTP is enabled, because a server on your own
-  network has no certificate a phone would trust.
+  network has no certificate a phone would trust. And the build declares
+  `ACCESS_LOCAL_NETWORK`, which Android 16 asks you to grant the first time the
+  app reaches a LAN address.
 
 If the stronger guarantee is what you want, leave the field empty and build
 `production-apk`. The device reader is still there, and still refuses rather
@@ -459,9 +501,9 @@ python tools/vlm-grade.py
 Runs every fixture through the running server and prints two numbers. **Read
 them differently:** a refusal costs a manual entry, while a wrong reading puts a
 number nobody measured into a medical history where nothing later questions it.
-The script exits non-zero only on the second.
+The script exits non-zero on the second, never on the first.
 
-Current, on an RTX 3060:
+Current, on the author's RTX 3060, over all 37 fixtures:
 
 ```
 photos graded          37
@@ -489,8 +531,9 @@ non-zero if it moves.
 ### Adding fixtures
 
 Drop photographs into `tools/fixtures/<sys>-<dia>-<pul>/` and they are graded
-automatically — by this script and by the test suite. Anything the folder name
-cannot say goes in a `folder.json` beside them:
+automatically — by this script, and by the test suite, which checks that the
+on-device recogniser never misreads them. Anything the folder name cannot say
+goes in a `folder.json` beside them, which this script reads:
 
 ```json
 { "irregular": true }
@@ -505,8 +548,12 @@ symbol lit, which is what the other folders are.
 
 | | |
 |---|---|
-| `GET /health` | `{"ok": true}` when the model is loaded. 503 otherwise. |
-| `POST /read` | Raw JPEG bytes (what the app sends), `multipart/form-data`, or `{"image": "<base64>"}` as JSON. |
+| `GET /health` | `{"ok": true, "model": true}` when llama-server answers. `503` with both `false` otherwise. |
+| `POST /read` | Raw JPEG bytes (what the app sends), `multipart/form-data`, or `{"image": "<base64>"}` as JSON. JPEG, PNG, WebP, MPO or AVIF; the image is downscaled to 1280 on the long side before the model sees it. |
+
+Both need the token. Errors come back as `{"error": "..."}`: `400` for an empty
+body or something that is not a photograph, `413` over 25 MB, `503` when four
+reads are already in flight, `502` when llama-server is unreachable or fails.
 
 ```json
 {
@@ -523,9 +570,12 @@ symbol lit, which is what the other folders are.
 ```
 
 `ok` is false whenever the app must not save the result unaided — an illegible
-panel, or the power-on self test with every segment lit. `systolic` and
-`diastolic` are either both present or both absent; `pulse` can be null on its
-own, since a missing pulse is worth strictly less than a wrong one.
+panel, renderings that disagreed, or the power-on self test with every segment
+lit; `reason` is then `"illegible"` or `"selfTest"`. `ok` is true only when both
+`systolic` and `diastolic` were read. On a refusal one of them may still carry a
+value the renderings agreed on, which the app pre-fills for the user to check.
+`pulse` can be null on its own, since a missing pulse is worth strictly less
+than a wrong one.
 
 `irregularHeartbeat` is `true` or `false` next to a reading and **`null` on a
 refusal** — "we could not read the display" and "the symbol was not showing" are
