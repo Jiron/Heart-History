@@ -4,8 +4,8 @@ Point your phone at a blood-pressure monitor. Heart History reads the numbers of
 the display, keeps the history, and draws the charts. All of it runs on the
 phone unless you set up assisted reading yourself.
 
-Built for the **Microlife BP B1 Classic**. The recogniser is written to cope with
-other seven-segment monitors too, not tuned to one set of photos.
+Built and tested against the **Microlife BP B1 Classic**. Other monitors with a
+seven-segment display may work, but none has been tried.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform: Android](https://img.shields.io/badge/platform-Android-3DDC84.svg)
@@ -23,6 +23,17 @@ other seven-segment monitors too, not tuned to one set of photos.
 <sub>The screenshots show generated demo data from `tools/seed-demo.ts`. The
 scanned display is a synthetic render from `tools/render-display.ts`, read by
 the on-device recogniser.</sub>
+
+## Where it stands
+
+The app itself works: history, charts, backups, the doctor's report and manual
+entry.
+
+Reading the display *on the phone* only works on clean, straight-on photos. In
+testing it read 2 of 33 hand-held ones and refused the rest. It never saved a
+wrong number, so in practice you will often type the values in yourself.
+[Assisted reading](#assisted-reading) closes that gap if you have a PC with a
+GPU to run a vision model on.
 
 ## What it does
 
@@ -116,6 +127,10 @@ capture conditions from ideal to unusable:
 | Severe | 97% | 0 |
 | Genuinely unreadable | — | **0 of 32 accepted** |
 
+These are generated, so they flatter the reader. The display always fills a
+good part of the frame, which real photos often don't. They are good for
+catching regressions, not for predicting real-world results.
+
 **Real photographs of the monitor** (`npm run ocr:real`). Each one is read
 through four different resize-and-re-encode chains, because the exact chain a
 phone uses cannot be reproduced offline. On a marginal photo, a grey level or
@@ -150,18 +165,22 @@ reads digits. [docs/ocr.md](docs/ocr.md) has the detail.
 
 ## Assisted reading
 
-This is optional, off by default, and needs a machine of your own. A vision
-model (Qwen3-VL-8B under llama.cpp) runs there and reads the same photographs.
-The figures below are from the most recent grading run documented in
-[server/README.md](server/README.md), on all 37 fixture photos:
+This is optional, off by default, and needs a PC of your own with a GPU. It runs
+a vision model (Qwen3-VL-8B under llama.cpp), and the app sends the photo there
+instead of reading it on the phone. On the 37 photos in `tools/fixtures/`:
 
-| | On device | Assisted |
+| | On the phone | Assisted |
 |---|---|---|
-| Photos read | 5, in at least one of four re-encodings | **33** |
+| Photos read | 5 of 37 | about 9 in 10 |
 | Blood pressure wrong | 0 | **0** |
-| Irregular-heartbeat symbol | not read | **9 of 9**, no false alarms |
-| Time per photo | ~0.1 s (measured in Node) | ~15 s on an RTX 3060 |
-| Needs a network | no | yes, to your own machine |
+| Irregular-heartbeat symbol | not detected | found on every lit photo it read, no false alarms |
+| Time per photo | under a second | about 15 s on an RTX 3060 |
+| Needs | nothing | a PC you run, reachable from the phone |
+
+These are from the author's own grading runs, written up in
+[docs/assisted-reading.md](docs/assisted-reading.md). Every photo it did not
+read, it refused rather than misread. Run `python tools/vlm-grade.py` against
+your own server to measure it on your hardware.
 
 Each photo is read from four renderings. A value is accepted only if at least
 three of them name it and none names anything different. It is not decided by
@@ -187,17 +206,8 @@ You need Node 20.19.4 or newer and either an Android device with
 
 ```bash
 git clone https://github.com/Jiron/Heart-History.git
-```
-
-```bash
 cd Heart-History
-```
-
-```bash
 npm install
-```
-
-```bash
 npm run android
 ```
 
@@ -212,20 +222,23 @@ and shows how to run a real build instead.
 npm run build:apk
 ```
 
-That builds a shareable, network-free APK through EAS. `npm run
-build:apk:assisted` builds the variant that can reach a reading server.
+That builds a shareable, network-free APK on EAS, which needs a free
+[expo.dev](https://expo.dev) account. `npm run build:apk:assisted` builds the
+variant that can reach a reading server.
 
 **Forking?** `app.config.ts` points at the original author's Expo project
 (`extra.eas.projectId` and `updates.url`) and uses the Android package
-`ch.opten.hearthistory`. Run `npx eas-cli init` for your own project and pick
-your own package id before you build. [docs/building.md](docs/building.md) has
-the full instructions, including local builds and Play Store bundles.
+`ch.opten.hearthistory`. Delete those two fields, run `npx eas-cli init` to link
+your own project, and pick your own package id before you build.
+[docs/building.md](docs/building.md) has the full instructions, including local
+builds and Play Store bundles.
 
 ## Developing
 
 ```bash
 npm test               # recogniser, classification and report test suites
 npm run typecheck      # tsc --noEmit
+npm run lint           # expo lint
 npm run ocr:bench      # accuracy across synthetic capture conditions
 npm run ocr:real       # accuracy against the real photos in tools/fixtures/
 npm run ocr:folders    # accuracy against the hand-held photo folders

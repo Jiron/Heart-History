@@ -19,9 +19,6 @@ to stay at zero too.
 
 ```bash
 npm install
-```
-
-```bash
 npm run android
 ```
 
@@ -32,10 +29,8 @@ thing that does not work inside Expo Go.
 
 ```bash
 npm test
-```
-
-```bash
 npm run typecheck
+npm run lint
 ```
 
 If you touched anything under `src/ocr/`, also run the benchmarks and include the
@@ -43,13 +38,7 @@ before and after numbers in the pull request:
 
 ```bash
 npm run ocr:bench
-```
-
-```bash
 npm run ocr:real
-```
-
-```bash
 npm run ocr:folders
 ```
 
