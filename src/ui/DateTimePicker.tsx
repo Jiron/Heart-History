@@ -40,13 +40,16 @@ export function DateTimePicker({
   const [draft, setDraft] = useState(value);
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(value));
 
-  // Re-seed whenever the sheet is reopened with a different value.
-  React.useEffect(() => {
+  // Re-seed whenever the sheet is reopened with a different value. Done during
+  // render rather than in an effect, so the sheet never opens on a stale month.
+  const [seededFrom, setSeededFrom] = useState({ visible, value });
+  if (seededFrom.visible !== visible || seededFrom.value !== value) {
+    setSeededFrom({ visible, value });
     if (visible) {
       setDraft(value);
       setViewMonth(startOfMonth(value));
     }
-  }, [visible, value]);
+  }
 
   const grid = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
   const draftDay = startOfDay(draft);
