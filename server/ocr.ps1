@@ -15,8 +15,10 @@
   ## Not killing the wrong thing
 
   There is more than one llama-server on this machine. `stop` matches on the
-  model filename in the command line rather than on the executable name, so an
-  unrelated server -- a chat model, someone else's project -- is left running.
+  `heart-history-vlm` alias start-vlm.ps1 passes on the command line rather than
+  on the executable name, so an unrelated server -- a chat model, someone else's
+  project -- is left running. The alias rather than the model filename, because
+  HH_VLM_MODEL can point at a file with any name.
   A process-name kill would have taken it out, which is the sort of thing you
   only notice later.
 #>
@@ -47,7 +49,7 @@ param(
 
 $ErrorActionPreference = 'Continue'
 $Here = $PSScriptRoot
-$ModelMatch = 'Qwen3VL'
+$ModelMatch = 'heart-history-vlm'
 $WrapperMatch = 'ocr_server.py'
 $LogDir = Join-Path $Here 'logs'
 

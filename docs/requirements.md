@@ -10,13 +10,13 @@ The brief, as agreed, plus the decisions taken while building. Anything marked
 | 1 | React Native app, Android first, runs in Expo Go, buildable to APK on expo.dev | Done |
 | 2 | Read systolic / diastolic / pulse from a photo of the monitor | Done |
 | 3 | Must generalise, not be tuned to the four sample photos | Done |
-| 4 | History, charts, trends | Planned |
-| 5 | Local storage, backup, export, import | Planned |
-| 6 | **Everything client-side. No server.** | Done — the shipping build. See below |
-| 7 | Filter by last week / month / year / all, and between two dates | Planned |
-| 8 | Add an entry fully manually, without a photo | Planned |
-| 9 | Edit any individual entry after the fact | Planned |
-| 10 | Good-looking, responsive, mobile-first | Planned |
+| 4 | History, charts, trends | Done |
+| 5 | Local storage, backup, export, import | Done |
+| 6 | **Everything client-side. No server.** | Done — the default builds. See below |
+| 7 | Filter by last week / month / year / all, and between two dates | Done |
+| 8 | Add an entry fully manually, without a photo | Done |
+| 9 | Edit any individual entry after the fact | Done |
+| 10 | Good-looking, responsive, mobile-first | Done |
 | 11 | Language selector, German by default | Done |
 
 ## No server, and how that is enforced
@@ -41,8 +41,9 @@ This is enforced structurally rather than promised:
 - Photos, readings and backups live in app-private storage. Exports are written
   to a file the user explicitly shares.
 
-There is therefore no "processing job" to delete from a server, because no
-photo ever leaves the device.
+In the default builds there is therefore no "processing job" to delete from a
+server, because no photo ever leaves the device. The one exception is opt-in and
+described next.
 
 ### Where requirement 6 was relaxed, and why
 

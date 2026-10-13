@@ -248,10 +248,10 @@ export const de = {
     readingsStored: 'Gespeicherte Messungen',
     privacyTitle: 'Alles bleibt auf diesem Telefon',
     privacyMessage:
-      'Fotos werden auf dem Gerät selbst ausgewertet. Heart History hat keinen Server, und die fertige App wird ganz ohne Netzwerkzugriff gebaut — deine Werte können dieses Telefon nur verlassen, wenn du sie selbst exportierst.',
+      'Fotos werden auf dem Gerät selbst ausgewertet, und nichts wird irgendwohin geschickt. Die Standardversion wird ganz ohne Netzwerkzugriff gebaut — deine Werte können dieses Telefon nur verlassen, wenn du sie selbst exportierst.',
     privacyAssistedTitle: 'Fotos gehen an deinen eigenen Server',
     privacyAssistedMessage: (url: string) =>
-      `Unterstütztes Lesen ist eingeschaltet: Jedes gescannte Foto wird an ${url} geschickt und dort ausgewertet. Es wird nicht gespeichert und verlässt dein Netzwerk nicht. Alle Messungen und Fotos bleiben auf diesem Telefon. Leere das Feld unter «Unterstütztes Lesen», wenn wieder ausschliesslich auf dem Gerät gelesen werden soll.`,
+      `Unterstütztes Lesen ist eingeschaltet: Jedes gescannte Foto wird an ${url} geschickt und dort ausgewertet. Der Server behält es nicht. Alle Messungen und Fotos bleiben auf diesem Telefon. Leere das Feld unter «Unterstütztes Lesen», wenn wieder ausschliesslich auf dem Gerät gelesen werden soll.`,
     medicalDisclaimer:
       'Heart History erfasst Messwerte. Es ist kein Medizinprodukt und stellt keine Diagnose — besprich die Bedeutung deiner Werte bitte mit einer Ärztin oder einem Arzt.',
     exportedCount: (n: number) =>
@@ -284,7 +284,7 @@ export const de = {
     permissionMessage:
       'Fotos werden auf diesem Telefon ausgewertet und nirgendwohin hochgeladen. Du kannst stattdessen auch ein vorhandenes Foto auswählen.',
     permissionMessageAssisted:
-      'Fotos werden an deinen eigenen Lese-Server geschickt und dort ausgewertet — sie verlassen dein Netzwerk nicht. Du kannst stattdessen auch ein vorhandenes Foto auswählen.',
+      'Fotos werden an deinen eigenen Lese-Server geschickt und dort ausgewertet; er behält sie nicht. Du kannst stattdessen auch ein vorhandenes Foto auswählen.',
     allowCamera: 'Kamera erlauben',
     choosePhoto: 'Foto auswählen',
     goBack: 'Zurück',

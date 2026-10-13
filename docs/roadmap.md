@@ -15,15 +15,15 @@ take two or three readings a minute apart and average them. A mode that walks
 through that — rest timer, then prompts for each reading, then saves the average
 as one entry — would make the numbers meaningfully more reliable.
 
-**More real photographs, of more readings.** There are 37 now, across four
-readings, and every structural fix came from them. What the set still cannot
-catch is a digit-specific bias: `8` misread as `0` was found only because a `88`
+**More real photographs, of more readings.** There are 37 now, across five
+readings and the power-on self test, and every structural fix came from them.
+What the set still cannot catch is a digit-specific bias: `8` misread as `0` was found only because a `88`
 happened to be in the data. Each new *reading* is worth more than ten more
 photographs of one already covered — particularly an `Err` screen, a low
 battery, and values whose digits are not already represented. Drop a folder
 named `sys-dia-pul` into `tools/fixtures/` and `tools/vlm-grade.py`,
-`npm run ocr:real` and the test suite all pick it up; a `folder.json` beside the
-photos carries anything the name cannot say.
+`npm run ocr:folders` and the test suite all pick it up; a `folder.json` beside
+the photos carries anything the name cannot say.
 
 **Raise the accept rate on hard photos.** The recogniser never accepts a wrong
 blood pressure, but on the three real fixtures it only reads the display about a
@@ -37,13 +37,16 @@ from.
 by the assisted reader now — see
 [assisted-reading.md](assisted-reading.md#the-irregular-heartbeat-symbol) for
 the measurements and why its aggregation rule is the opposite of the one the
-numbers use. The cuff-fit tick, the stored-average `A` and the traffic-light
-position are still user toggles only. Adding each is a schema field and a
-paragraph of prompt, and the same grading harness measures it — but each one
-also needs fixtures where it is lit *and* fixtures where it is not, because the
-false-alarm rate is the number that decides whether it can be trusted. On the
-device reader they remain undetected; they sit at known positions relative to
-the value block, so it is tractable there too, and follows panel detection.
+numbers use. The assisted reader does not look for the cuff-fit tick, the
+stored-average `A` or the traffic-light position, and none of them is stored
+with a reading. Adding each is a schema field and a paragraph of prompt, and the
+same grading harness measures it — but each one also needs fixtures where it is
+lit *and* fixtures where it is not, because the false-alarm rate is the number
+that decides whether it can be trusted. The device reader already recognises the
+stored-average `A` in the header and warns about it; the other two, and the
+irregular-heartbeat symbol, remain undetected there. They sit at known positions
+relative to the value block, so it is tractable there too, and follows panel
+detection.
 
 **Batch scanning of stored readings.** The monitor keeps its last 30
 measurements. Stepping through them with `M` and scanning each is tedious; a mode

@@ -7,10 +7,18 @@
   Listens on 127.0.0.1:6001 (loopback only). The phone never talks to this
   directly; it talks to ocr_server.py on port 6000, which forwards to here.
 
+  ## Paths
+
+      $env:HH_LLAMA_SERVER = 'C:\llama.cpp\llama-server.exe'
+      $env:HH_VLM_MODEL    = 'C:\models\Qwen3VL-8B-Instruct-Q4_K_M.gguf'
+      $env:HH_VLM_MMPROJ   = 'C:\models\mmproj-Qwen3VL-8B-Instruct-F16.gguf'
+
+  Unset, each falls back to where the author's machine keeps it.
+
   ## Choosing a GPU
 
-      $env:HH_VLM_GPU = 'igpu'     # Radeon 8060S — the default
-      $env:HH_VLM_GPU = 'nvidia'   # RTX 3060
+      $env:HH_VLM_GPU = 'igpu'     # first AMD or Intel adapter — the default
+      $env:HH_VLM_GPU = 'nvidia'   # first NVIDIA adapter
       $env:HH_VLM_GPU = 'Vulkan1'  # an exact device id, if you know it
 
   Selected by *name*, not by index, and that is not fussiness. llama.cpp's
@@ -38,8 +46,8 @@
     --n-gpu-layers 999  Every layer on the GPU. Partial offload keeps the
                       remainder in RAM and computes it on the CPU.
 
-  On this machine the iGPU does *not* come out of system RAM: 64 GB is carved off
-  in the BIOS as dedicated VRAM, so a model in it costs the OS nothing. Measured
+  On the author's machine the iGPU does *not* come out of system RAM: 64 GB is
+  carved off in the BIOS as dedicated VRAM, so a model in it costs the OS nothing. Measured
   by diffing the dedicated-usage counter across a restart, this model occupies
   5.55 GB of that carve against a 949 MB process working set. Both numbers
   depend on the flag above — with mmap the weights land in system RAM *and* get
@@ -48,9 +56,11 @@
 
 $ErrorActionPreference = 'Continue'
 
-$LlamaServer = 'D:\AiApiStuff\runtime\llamacpp\llama-server.exe'
-$Model       = 'D:\AiApiStuff\models\Qwen3VL-8B-Instruct-Q4_K_M.gguf'
-$MMProj      = 'D:\AiApiStuff\models\mmproj-Qwen3VL-8B-Instruct-F16.gguf'
+# Where llama.cpp and the model live. Set these to your own paths; the
+# fallbacks are where the author's machine keeps them.
+$LlamaServer = if ($env:HH_LLAMA_SERVER) { $env:HH_LLAMA_SERVER } else { 'D:\AiApiStuff\runtime\llamacpp\llama-server.exe' }
+$Model       = if ($env:HH_VLM_MODEL)    { $env:HH_VLM_MODEL }    else { 'D:\AiApiStuff\models\Qwen3VL-8B-Instruct-Q4_K_M.gguf' }
+$MMProj      = if ($env:HH_VLM_MMPROJ)   { $env:HH_VLM_MMPROJ }   else { 'D:\AiApiStuff\models\mmproj-Qwen3VL-8B-Instruct-F16.gguf' }
 
 $Port = if ($env:HH_VLM_PORT) { $env:HH_VLM_PORT } else { '6001' }
 $Want = if ($env:HH_VLM_GPU)  { $env:HH_VLM_GPU }  else { 'igpu' }

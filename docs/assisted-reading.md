@@ -11,7 +11,8 @@ the parts that did not work. Setup instructions live in
 Twenty-three photographs of a Microlife BP B1, taken the way a person takes
 them — monitor small in frame, held at an angle, sometimes lit by a phone
 torch, sometimes slightly out of focus. Two known readings, `106/88/104` and
-`107/78/98`.
+`107/78/98`. (The third folder, `167-105-50`, came later; see
+*The 37-photo run*.)
 
 The on-device recogniser, given every one of them through four preprocessing
 chains:
@@ -135,7 +136,8 @@ on disagreement returns nothing, which is correct.
 
 ### Measured, with 8B on an RTX 3060
 
-Qwen3-VL-8B-Instruct Q4_K_M, four renderings, all 27 fixtures:
+Qwen3-VL-8B-Instruct Q4_K_M, four renderings, all 27 fixtures there were at the
+time:
 
 | | Device reader | 27B, one look | 8B, four renderings |
 |---|---|---|---|
@@ -312,10 +314,12 @@ model asked for numbers will produce numbers:
 
 Not free, and the trade is real:
 
-- **It is not on the phone.** It needs a machine on your network running two
-  processes. Away from home, the app falls back to the device reader.
-- **It needs network permission.** Released builds have `INTERNET` stripped by
-  Android. Assisted reading requires the separate `assisted-apk` profile, so the
+- **It is not on the phone.** It needs a machine you run, with two processes on
+  it. Whenever the app cannot reach it — away from home without a tunnel, or with
+  the machine off — the app falls back to the device reader.
+- **It needs network permission.** The default builds have `INTERNET` stripped
+  from the manifest, and Android enforces that. Assisted reading requires the
+  separate `assisted-apk` profile (or a development build), so the
   guarantee changes from "cannot reach a network" to "reaches the address you
   typed". That is a downgrade, and it is why this is opt-in and why it is a
   different binary rather than a setting.
@@ -324,9 +328,9 @@ Not free, and the trade is real:
   on device. This is why the camera no longer waits — see `state/scanBuffer.ts`.
   Which GPU is a resource question rather than a quality one — zero wrong on
   both, and the one-photo difference in accept rate is backend noise on a
-  borderline image, not a reason to choose. Neither costs system RAM on this
-  machine: 5.55 GB of the iGPU's dedicated 64 GB carve, or 7.4 GB of the 3060,
-  against a ~1 GB working set either way. `server/README.md` has the comparison
+  borderline image, not a reason to choose. Neither costs system RAM on the
+  author's machine: 5.55 GB of the iGPU's dedicated 64 GB carve, or 7.4 GB of
+  the 3060, against a ~1 GB working set either way. `server/README.md` has the comparison
   and how to measure it.
 
 ---
