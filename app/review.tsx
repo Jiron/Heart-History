@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import React, { useMemo, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -34,17 +34,24 @@ export default function ReviewScreen() {
   const [draft, setDraft] = useState<ReadingDraft>(() => emptyDraft());
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!outcome) return;
-    const r = outcome.result;
-    setDraft((prev) => ({
-      ...prev,
-      systolic: r.systolic,
-      diastolic: r.diastolic,
-      pulse: r.pulse,
-      irregularHeartbeat: r.icons.irregularHeartbeat === true,
-    }));
-  }, [outcome]);
+  // Fill the form once per result. Done during render rather than in an effect,
+  // so the values land in the same frame as the photo instead of one after.
+  // Starts empty, not at `outcome`: the scan has usually finished before this
+  // screen mounts, and that first result still has to be filled in.
+  const [filledFrom, setFilledFrom] = useState<typeof outcome>(null);
+  if (outcome !== filledFrom) {
+    setFilledFrom(outcome);
+    if (outcome) {
+      const r = outcome.result;
+      setDraft((prev) => ({
+        ...prev,
+        systolic: r.systolic,
+        diastolic: r.diastolic,
+        pulse: r.pulse,
+        irregularHeartbeat: r.icons.irregularHeartbeat === true,
+      }));
+    }
+  }
 
   const deviceHint = useMemo(() => {
     if (!outcome) return null;

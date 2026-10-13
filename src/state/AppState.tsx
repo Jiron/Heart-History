@@ -111,8 +111,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    setReady(false);
-    setError(null);
     (async () => {
       try {
         /**
@@ -156,7 +154,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     };
   }, [load, attempt]);
 
-  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  // Back to the splash before trying again. Reset here, in the handler, rather
+  // than at the top of the effect: the first attempt already starts that way.
+  const retry = useCallback(() => {
+    setReady(false);
+    setError(null);
+    setAttempt((n) => n + 1);
+  }, []);
 
   const profile = useMemo(
     () => profiles.find((p) => p.id === settings?.activeProfileId) ?? profiles[0],

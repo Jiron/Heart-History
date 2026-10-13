@@ -54,6 +54,14 @@ export default function HistoryScreen() {
     to: Date.now(),
   }));
   const [picking, setPicking] = useState<'from' | 'to' | null>(null);
+  // The latest day the picker allows. Read from the clock when the sheet opens
+  // rather than during render, which has to stay pure; "today" only needs to
+  // hold for as long as the sheet is up.
+  const [pickerMax, setPickerMax] = useState(0);
+  const openPicker = (field: 'from' | 'to') => {
+    setPickerMax(Date.now());
+    setPicking(field);
+  };
   const [band, setBand] = useState<BandFilter>('all');
 
   const range: DateRange = useMemo(
@@ -120,13 +128,13 @@ export default function HistoryScreen() {
                   <DateField
                     label={t.history.from}
                     value={custom.from}
-                    onPress={() => setPicking('from')}
+                    onPress={() => openPicker('from')}
                   />
                   <Ionicons name="arrow-forward" size={16} color={theme.colors.textFaint} />
                   <DateField
                     label={t.history.to}
                     value={custom.to}
-                    onPress={() => setPicking('to')}
+                    onPress={() => openPicker('to')}
                   />
                 </View>
               </Card>
@@ -218,7 +226,7 @@ export default function HistoryScreen() {
         mode="date"
         title={picking === 'from' ? t.history.from : t.history.to}
         value={picking === 'to' ? custom.to : custom.from}
-        maximum={Date.now()}
+        maximum={pickerMax}
         onCancel={() => setPicking(null)}
         onConfirm={(ts) => {
           setCustom((prev) =>

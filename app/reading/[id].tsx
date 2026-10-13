@@ -43,8 +43,12 @@ export default function ReadingDetailScreen() {
   const [draft, setDraft] = useState<ReadingDraft>(() => emptyDraft());
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!reading) return;
+  // Load the form from the stored reading, and again whenever it changes. Done
+  // during render rather than in an effect; starts at null so the first render
+  // fills it too.
+  const [loadedFrom, setLoadedFrom] = useState<typeof reading>(null);
+  if (reading && reading !== loadedFrom) {
+    setLoadedFrom(reading);
     setDraft({
       systolic: reading.systolic,
       diastolic: reading.diastolic,
@@ -56,7 +60,7 @@ export default function ReadingDetailScreen() {
       note: reading.note ?? '',
       tags: reading.tags,
     });
-  }, [reading]);
+  }
 
   useEffect(() => {
     navigation.setOptions({

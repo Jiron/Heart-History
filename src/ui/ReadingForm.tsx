@@ -113,8 +113,11 @@ export function ReadingForm({
   const theme = useTheme();
   const t = useTranslation();
   const [picking, setPicking] = useState(false);
+  // Read from the clock when the picker opens rather than during render, which
+  // has to stay pure. A reading cannot be from the future.
+  const [pickerMax, setPickerMax] = useState(0);
 
-  const patch = (part: Partial<ReadingDraft>) => onChange({ ...draft, ...part });
+  const patch =(part: Partial<ReadingDraft>) => onChange({ ...draft, ...part });
 
   return (
     <View style={{ gap: 16 }}>
@@ -165,7 +168,10 @@ export function ReadingForm({
       <Card>
         <SectionHeader title={t.form.when} />
         <Pressable
-          onPress={() => setPicking(true)}
+          onPress={() => {
+            setPickerMax(Date.now());
+            setPicking(true);
+          }}
           accessibilityRole="button"
           style={[
             styles.dateButton,
@@ -271,7 +277,7 @@ export function ReadingForm({
       <DateTimePicker
         visible={picking}
         value={draft.measuredAt}
-        maximum={Date.now()}
+        maximum={pickerMax}
         title={t.form.whenTitle}
         onCancel={() => setPicking(false)}
         onConfirm={(ts) => {
@@ -307,9 +313,14 @@ function NumberField({
   // Kept as text so the field can be empty mid-edit rather than snapping to 0.
   const [text, setText] = useState(value === null ? '' : String(value));
 
-  React.useEffect(() => {
+  // Follow the value when it changes from outside -- a stepper, a scan landing.
+  // Done during render rather than in an effect, so the field never paints one
+  // frame showing the old number.
+  const [shown, setShown] = useState(value);
+  if (value !== shown) {
+    setShown(value);
     setText(value === null ? '' : String(value));
-  }, [value]);
+  }
 
   const step = (delta: number) => {
     Haptics.selectionAsync().catch(() => {});
