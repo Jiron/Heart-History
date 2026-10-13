@@ -1,63 +1,109 @@
 # Heart History
 
 Point your phone at a blood-pressure monitor. Heart History reads the numbers off
-the display, keeps the history, and draws the charts — entirely on the device.
+the display, keeps the history, and draws the charts. All of it runs on the
+phone unless you set up assisted reading yourself.
 
-Built for the **Microlife BP B1 Classic**, and written to generalise to other
-seven-segment monitors rather than being tuned to one set of photos.
+Built for the **Microlife BP B1 Classic**. The recogniser is written to cope with
+other seven-segment monitors too, not tuned to one set of photos.
 
-```bash
-npm install
-npm run android      # Expo Go on a connected device or emulator
-```
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Platform: Android](https://img.shields.io/badge/platform-Android-3DDC84.svg)
+![Expo SDK 57](https://img.shields.io/badge/Expo%20SDK-57-000020.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6.svg)
+
+| Today | Check a scan | History | Trends |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/home.png" width="200" alt="Today screen: latest reading, scan and add buttons, 7-day average and a 30-day chart"> | <img src="docs/screenshots/scan-review.png" width="200" alt="Review screen after a scan: the photo, a 'read successfully' banner and the pre-filled values"> | <img src="docs/screenshots/history.png" width="200" alt="History screen grouped by day, with period and level filters"> | <img src="docs/screenshots/trends.png" width="200" alt="Trends screen: systolic and diastolic over three months"> |
+
+| Insights | Ranges | Dark mode |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/insights.png" width="200" alt="Period statistics, spread across categories and averages by time of day"> | <img src="docs/screenshots/ranges.png" width="200" alt="Blood pressure ranges screen listing every category with its systolic and diastolic bounds"> | <img src="docs/screenshots/dark-trends.png" width="200" alt="Trends screen in dark mode"> |
+
+<sub>The screenshots show generated demo data from `tools/seed-demo.ts`. The
+scanned display is a synthetic render from `tools/render-display.ts`, read by
+the on-device recogniser.</sub>
 
 ## What it does
 
-- **Scan a reading.** Photograph the display; systolic, diastolic and pulse are
-  read and pre-filled for you to confirm — along with the monitor's
-  irregular-heartbeat symbol, if it was lit.
-- **Or type it in.** Full manual entry, no photo needed. Every reading can be
-  edited or deleted afterwards.
-- **See the history.** Grouped by day, filtered by last week / month / 3 months /
-  year / all, or between any two dates, and by how raised the reading was.
-- **See the trends.** Systolic and diastolic over time, distribution across the
-  categories, averages by time of day, and the 7-day morning-and-evening average
-  that home-monitoring guidance asks for.
-- **Keep it safe.** JSON backup, CSV export, and a printable PDF report for a
-  doctor's appointment. Restore by merging or replacing.
-- **Know what the colours mean.** Every category, its systolic and diastolic
-  range and what it describes, on one screen — with the thresholds editable if a
-  clinician has given you different targets.
-- **Share the monitor.** Separate profiles, each with its own history and targets.
-- **Read it in your language.** German and English, German by default, switchable
-  in Settings. Dates and number formats follow the choice.
+- **Scan a reading.** Photograph the display, or pick a photo you already took.
+  Systolic, diastolic and pulse are filled in for you to confirm. Nothing is
+  saved until you do.
+- **Or type it in.** Manual entry needs no photo. You can also note the arm,
+  your posture, tags, a note, and whether the monitor flagged an irregular
+  heartbeat. Every reading can be edited or deleted later.
+- **See where you stand.** The home screen shows the latest reading, a 30-day
+  chart, and the 7-day morning-and-evening average that home-monitoring
+  guidance asks for.
+- **See the history.** Readings are grouped by day. Filter by last week, month,
+  3 months, year, all time or any two dates, and by how raised the reading was.
+- **See the trends.** Systolic and diastolic over time, with pulse optional. You
+  also get:
+  - which way the numbers are heading
+  - pulse pressure, mean arterial pressure and variation
+  - how readings spread across the categories
+  - averages by time of day
+  - a note when irregular-heartbeat flags turn up
+- **Keep it safe.** Back up to JSON, export CSV, or print a PDF report for a
+  doctor's appointment. Restore by merging with what you have or by replacing
+  it.
+- **Know what the colours mean.** One screen lists every category with its
+  systolic and diastolic range and what it describes. You can choose the
+  standard ESH scale, home-measurement thresholds, or your own if a clinician
+  gave you different ones.
+- **Share the monitor.** Each profile gets its own history and an optional
+  personal target line on the charts. The category scale is shared across
+  profiles.
+- **Read it in your language.** German and English, plus *Automatic*, which
+  follows the phone's language. German is the default. Dates follow your
+  choice.
+- **Light and dark.** Follows the system, or pick one.
 
-## No server
+## Privacy and the network
 
-There isn't one, and there is no way to add one by accident.
+**By default, nothing leaves the phone.** The recogniser in `src/ocr/` is plain
+TypeScript over typed arrays. It uses no native modules, makes no network calls
+and needs no cloud service. The same source file runs on the phone under Hermes
+and in Node under the test suite, which is what makes it testable at all.
 
-The recogniser is plain TypeScript over typed arrays: no native modules, no
-network calls, no cloud service. The *same source file* runs on the phone under
-Hermes and in Node under the test suite, which is what makes it testable at all.
+`app.config.ts` removes `android.permission.INTERNET` from the Android manifest
+of the `preview`, `production` and `production-apk` builds. Android enforces
+that, so those builds *cannot* make a network request, whatever a future
+dependency tries. Photos, readings and backups live in app-private storage. An
+export only leaves the device when you pick a destination in the share sheet.
 
-`app.config.ts` strips `android.permission.INTERNET` from the manifest of every
-released build, so the guarantee is enforced by Android rather than by our good
-intentions — the app is *incapable* of making a network request. Photos, readings
-and backups live in app-private storage; an export only leaves the device when
-you pick a destination in the share sheet.
+Two build profiles do have network access. Neither is the default, and both are
+opt-in:
 
-Two builds are exempt, both opt-in and neither the default. A **development**
-build has to reach the Metro bundler to load JavaScript at all. And an
-**`assisted-apk`** build can reach a reading server you run yourself — see
-[assisted reading](#assisted-reading) below, which is a real trade and is
-described as one. `preview`, `production` and `production-apk` are unchanged.
+| Build | Network | Why |
+|---|---|---|
+| `preview`, `production`, `production-apk` | **none** | The default. Everything is on the device. |
+| `development` | yes | Has to reach the Metro bundler to load JavaScript at all. |
+| `assisted-apk` | yes | Can send photos to a reading server you run yourself (see below). |
+
+**Assisted reading only turns on when you ask for it twice.** You need the
+`assisted-apk` build, and you need to enter a server address in *Settings ›
+Assisted reading*. Each scan then sends one photo: a JPEG re-encoded on the
+phone, at most 1280 px on the long side, with your bearer token. No readings, no
+history and no profile data go with it. If the server cannot be reached, the
+phone reads the photo itself and tells you why. Clear the field and you are back
+to on-device reading.
+
+Two more things, so nothing here surprises you:
+
+- Builds with network access also have Expo's update service configured
+  (`updates` in `app.config.ts`), so they can check `u.expo.dev` for
+  over-the-air updates. Builds without network access cannot.
+- The network block is an Android manifest feature. Every build profile and
+  script in this repo targets Android. While you develop in Expo Go, the app
+  runs under Expo Go's own manifest, which does include `INTERNET`.
 
 ## How well does it read a display?
 
 Two benchmarks, because they answer different questions.
 
-**256 synthetic photos** with known ground truth, spanning capture conditions
-from ideal to unusable:
+**256 synthetic photos** with known ground truth (`npm run ocr:bench`), covering
+capture conditions from ideal to unusable:
 
 | Condition | Exact (all three values) | Wrongly accepted |
 |---|---|---|
@@ -70,10 +116,10 @@ from ideal to unusable:
 | Severe | 97% | 0 |
 | Genuinely unreadable | — | **0 of 32 accepted** |
 
-**Real photographs of the monitor**, each read through four different
-resize-and-re-encode chains because the exact one a phone uses cannot be
-reproduced offline — and on marginal photos a grey level or two decides whether a
-segment reads as lit:
+**Real photographs of the monitor** (`npm run ocr:real`). Each one is read
+through four different resize-and-re-encode chains, because the exact chain a
+phone uses cannot be reproduced offline. On a marginal photo, a grey level or
+two decides whether a segment reads as lit:
 
 | Photo | Truth | Accepted | Read |
 |---|---|---|---|
@@ -82,60 +128,112 @@ segment reads as lit:
 | Low contrast, hard shadow over the glass | 107/78/98 | 2 of 4 | 107/78 |
 | Power-on self test (all segments lit) | must refuse | 0 of 4 | — |
 
-**Nothing wrong was ever accepted** — not in 256 synthetic images, not in 16 real
-reads. That is the column that matters: a blood-pressure log which silently
+**Nothing wrong was ever accepted**, not in 256 synthetic images and not in 16
+real reads. That is the column that matters. A blood-pressure log that silently
 records a number you did not measure is worse than one that asks you to check.
 
 ### And where it stops working
 
-Twenty-three later photographs, taken the way a person actually takes them —
-monitor small in frame, at an angle, lit by a phone torch — were read through
-the same four chains:
+Thirty-three later photographs, taken the way people actually take them, were
+read through the same four chains (`npm run ocr:folders`). The monitor is small
+in the frame, at an angle, and lit by a phone torch:
 
 ```
-runs 92   accepted 4   correct 4   WRONG 0
+runs 132   accepted 5   correct 5   WRONG 0
 ```
 
-**One photograph out of twenty-three.** Still nothing wrong, but as a reader,
-on the input that matters, it does not work. The cause is structural rather than
-a matter of tuning: nothing in the pipeline finds the display or corrects
-perspective, so a panel at a tenth of the frame and twenty degrees never reaches
-the code that reads digits. [docs/ocr.md](docs/ocr.md) has the detail.
+**Two photographs out of thirty-three.** Still nothing wrong, but on the input
+that matters it does not work as a reader. The cause is structural, not a matter
+of tuning. Nothing in the pipeline finds the display or corrects perspective, so
+a panel at a tenth of the frame and twenty degrees never reaches the code that
+reads digits. [docs/ocr.md](docs/ocr.md) has the detail.
 
 ## Assisted reading
 
-Optional, off by default, and it needs a machine of your own. A vision model
-running locally reads those same photographs:
+This is optional, off by default, and needs a machine of your own. A vision
+model (Qwen3-VL-8B under llama.cpp) runs there and reads the same photographs.
+The figures below are from the most recent grading run documented in
+[server/README.md](server/README.md), on all 37 fixture photos:
 
 | | On device | Assisted |
 |---|---|---|
-| Photos read | 1 of 23 | **24 of 27** |
+| Photos read | 5, in at least one of four re-encodings | **33** |
 | Blood pressure wrong | 0 | **0** |
-| Time per photo | under a second | 11 s on a 3060, 17 s on an iGPU |
+| Irregular-heartbeat symbol | not read | **9 of 9**, no false alarms |
+| Time per photo | ~0.1 s (measured in Node) | ~15 s on an RTX 3060 |
 | Needs a network | no | yes, to your own machine |
 
-Each photo is read four times, from four renderings, and a value is accepted only
-if all of them agree — not by majority, because on the hardest photo the majority
-was wrong. That is what keeps the wrong column at zero.
+Each photo is read from four renderings. A value is accepted only if at least
+three of them name it and none names anything different. It is not decided by
+majority, because on the hardest photo the majority was wrong, and that rule is
+what keeps the wrong column at zero. A fifth, zoomed look votes only on the
+irregular-heartbeat symbol.
 
-The server keeps nothing: the photo lives in memory for one request, there is no
-database and no upload directory, and even the console line omits the values.
-History, photos and backups stay on the phone. Every endpoint requires a bearer
-token, generated on first run, so the server can safely sit behind a Cloudflare
-tunnel rather than only on the LAN.
+The server keeps nothing. The photo lives in memory for one request. There is no
+database and no upload directory, and even the console line leaves out the
+values. History, photos and backups stay on the phone. Every endpoint requires a
+bearer token, generated on first run. That lets the server sit behind a
+Cloudflare tunnel instead of only on the LAN, with the trade-offs
+[server/README.md](server/README.md#behind-a-cloudflare-tunnel) spells out.
 
-Setup is in [server/README.md](server/README.md); the reasoning, including what
-was tried and discarded, is in
-[docs/assisted-reading.md](docs/assisted-reading.md).
+The server scripts are PowerShell, so it runs on Windows as written. Setup is in
+[server/README.md](server/README.md). The reasoning, including what was tried
+and discarded, is in [docs/assisted-reading.md](docs/assisted-reading.md).
+
+## Getting started
+
+You need Node 20.19.4 or newer and either an Android device with
+[Expo Go](https://expo.dev/go) or an Android emulator.
+
+```bash
+git clone https://github.com/Jiron/Heart-History.git
+```
+
+```bash
+cd Heart-History
+```
+
+```bash
+npm install
+```
+
+```bash
+npm run android
+```
+
+`npm run android` starts Metro and opens the app in Expo Go. Everything works
+there except restoring a backup, which is a limit of Expo Go itself.
+[docs/building.md](docs/building.md#the-one-thing-expo-go-cannot-do) explains it
+and shows how to run a real build instead.
 
 ## Building an APK
 
 ```bash
-npm run build:apk        # shareable APK via EAS
+npm run build:apk
 ```
 
-Full instructions, including local builds and Play Store bundles, are in
-[docs/building.md](docs/building.md).
+That builds a shareable, network-free APK through EAS. `npm run
+build:apk:assisted` builds the variant that can reach a reading server.
+
+**Forking?** `app.config.ts` points at the original author's Expo project
+(`extra.eas.projectId` and `updates.url`) and uses the Android package
+`ch.opten.hearthistory`. Run `npx eas-cli init` for your own project and pick
+your own package id before you build. [docs/building.md](docs/building.md) has
+the full instructions, including local builds and Play Store bundles.
+
+## Developing
+
+```bash
+npm test               # recogniser, classification and report test suites
+npm run typecheck      # tsc --noEmit
+npm run ocr:bench      # accuracy across synthetic capture conditions
+npm run ocr:real       # accuracy against the real photos in tools/fixtures/
+npm run ocr:folders    # accuracy against the hand-held photo folders
+npm run ocr:debug      # render one synthetic display and dump annotated PNGs
+```
+
+[tools/README.md](tools/README.md) describes every development tool, including
+how to add a real photo as a regression test.
 
 ## Documentation
 
@@ -147,20 +245,21 @@ Full instructions, including local builds and Play Store bundles, are in
 | [architecture.md](docs/architecture.md) | Project layout and data model |
 | [building.md](docs/building.md) | Running, testing and shipping |
 | [roadmap.md](docs/roadmap.md) | Ideas worth building next |
+| [server/README.md](server/README.md) | Running the assisted reader, and how it handles untrusted uploads |
 
-## Developing
+## Contributing
 
-```bash
-npm run android      # run in Expo Go
-npm test             # recogniser test suite
-npm run ocr:bench    # accuracy benchmark across synthetic capture conditions
-npm run ocr:real     # accuracy against the real photos in tools/fixtures/
-npm run ocr:debug    # render one synthetic display and dump annotated PNGs
-npm run typecheck
-```
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for
+the one rule that matters most here. Security issues go through
+[SECURITY.md](SECURITY.md) rather than a public issue.
+
+## License
+
+[MIT](LICENSE). Use it, change it, ship it, sell it. Just keep the copyright
+notice.
 
 ## A word on what this is
 
-Heart History records measurements. It is not a medical device, it does not
-diagnose anything, and the categories it shows describe a single reading rather
-than a person. What your readings mean is a conversation to have with a doctor.
+Heart History records measurements. It is not a medical device and it does not
+diagnose anything. The categories it shows describe a single reading, not a
+person. What your readings mean is a conversation to have with a doctor.
