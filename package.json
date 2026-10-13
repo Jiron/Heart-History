@@ -1,6 +1,12 @@
 {
   "name": "heart-history",
   "version": "1.0.0",
+  "description": "Reads a blood-pressure monitor display with the phone camera and keeps the history on the phone.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Jiron/Heart-History.git"
+  },
   "main": "expo-router/entry",
   "private": true,
   "scripts": {
